@@ -1,0 +1,7 @@
+node_modules/
+dist/
+dist2/
+dist3/
+dist3.zip
+data/save.json
+*.log
