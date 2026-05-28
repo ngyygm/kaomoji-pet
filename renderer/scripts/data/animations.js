@@ -1,0 +1,81 @@
+/**
+ * CSS 动画定义 — 不再使用帧替换，全部通过分段特效 + CSS 动画类实现
+ * 统一模板 ( X ω X )，只改眼睛字符
+ */
+const ANIMATIONS = {
+  happy:      { description: '开心', cssClass: 'bounce' },
+  normal:     { description: '平静', cssClass: '' },
+  hungry:     { description: '饥饿', cssClass: 'shiver' },
+  sleepy:     { description: '困倦', cssClass: 'breathe' },
+  angry:      { description: '生气', cssClass: 'shiver' },
+  love:       { description: '爱意', cssClass: 'wiggle' },
+  eating:     { description: '吃东西', cssClass: 'bounce' },
+  playing:    { description: '玩耍', cssClass: 'bounce' },
+  sleeping:   { description: '睡觉', cssClass: 'breathe' },
+  walking:    { description: '行走', cssClass: '' },
+  greeting:   { description: '打招呼', cssClass: 'wiggle' },
+  levelup:    { description: '升级', cssClass: 'bounce' },
+  sad:        { description: '悲伤', cssClass: '' },
+  evolve:     { description: '进化', cssClass: 'bounce' },
+  surprised:  { description: '惊讶', cssClass: 'bounce' },
+  curious:    { description: '好奇', cssClass: 'tiltRight' },
+  stretch:    { description: '伸懒腰', cssClass: 'stretch' },
+  clean:      { description: '清洁', cssClass: 'wiggle' },
+  tail_chase: { description: '追尾巴', cssClass: 'spin' },
+  yawn:       { description: '打哈欠', cssClass: 'stretch' },
+  blink:      { description: '眨眼', cssClass: '' },
+  look_left:  { description: '向左看', cssClass: 'tiltLeft' },
+  look_right: { description: '向右看', cssClass: 'tiltRight' },
+  look_up:    { description: '向上看', cssClass: '' },
+  alert:      { description: '警觉', cssClass: 'bounce' },
+  satisfied:  { description: '满足', cssClass: 'squish' },
+  stressed:   { description: '紧张', cssClass: 'shiver' },
+  drowsy:     { description: '困倦', cssClass: 'breathe' },
+  confused:   { description: '困惑', cssClass: 'shiver' },
+  shy:        { description: '害羞', cssClass: 'squish' },
+  worried:    { description: '担心', cssClass: '' },
+  smug:       { description: '得意', cssClass: 'wiggle' },
+  winking:    { description: '眨眼', cssClass: '' },
+  amazed:     { description: '惊叹', cssClass: 'bounce' }
+};
+
+const IDLE_SEQUENCE = [
+  { type: 'blink', duration: 3000 },
+  { type: 'pause', duration: 5000 },
+  { type: 'look_left', duration: 2500 },
+  { type: 'pause', duration: 4000 },
+  { type: 'look_right', duration: 2500 },
+  { type: 'pause', duration: 6000 },
+  { type: 'blink', duration: 2000 },
+  { type: 'pause', duration: 4000 },
+  { type: 'winking', duration: 2000 },
+  { type: 'pause', duration: 5000 },
+  { type: 'stretch', duration: 3000 },
+  { type: 'pause', duration: 7000 },
+  { type: 'clean', duration: 3000 },
+  { type: 'pause', duration: 5000 },
+  { type: 'blink', duration: 2000 },
+  { type: 'pause', duration: 6000 },
+  { type: 'look_up', duration: 2500 },
+  { type: 'pause', duration: 5000 },
+  { type: 'yawn', duration: 3000 },
+  { type: 'pause', duration: 8000 },
+  { type: 'tail_chase', duration: 3000 },
+  { type: 'pause', duration: 6000 },
+  { type: 'blink', duration: 2000 },
+  { type: 'pause', duration: 5000 },
+  { type: 'satisfied', duration: 3000 },
+  { type: 'pause', duration: 7000 }
+];
+
+const CSS_ANIMATION_CLASSES = {
+  bounce:    { description: '垂直弹跳', keyframe: 'bounce' },
+  wiggle:    { description: '左右摇摆旋转', keyframe: 'wiggle' },
+  breathe:   { description: '缓慢缩放呼吸（无限循环）', keyframe: 'breathe' },
+  tiltLeft:  { description: '向左歪头', keyframe: 'tiltLeft' },
+  tiltRight: { description: '向右歪头', keyframe: 'tiltRight' },
+  squish:    { description: '挤压变形', keyframe: 'squish' },
+  shiver:    { description: '快速水平颤抖（3次）', keyframe: 'shiver' },
+  stretch:   { description: '拉伸伸展', keyframe: 'stretch' },
+  spin:      { description: '360度旋转', keyframe: 'spin' }
+};

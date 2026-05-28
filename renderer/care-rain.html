@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <style>
+    * { margin: 0; padding: 0; user-select: none; }
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: transparent;
+    }
+    .rain-word {
+      position: absolute;
+      font-family: 'Segoe UI', sans-serif;
+      font-size: 24px;
+      pointer-events: none;
+      animation: rainFall var(--fall-duration, 6s) ease-in forwards;
+      opacity: 0;
+      white-space: nowrap;
+    }
+    @keyframes rainFall {
+      0% { opacity: 0; transform: translateY(-40px); }
+      6% { opacity: var(--peak-opacity, 0.85); }
+      80% { opacity: var(--peak-opacity, 0.85); }
+      100% { opacity: 0; transform: translateY(var(--fall-distance, 1600px)); }
+    }
+  </style>
+</head>
+<body>
+  <script>
+    const { ipcRenderer } = require('electron');
+    ipcRenderer.on('show-care-rain', (event, { messages, duration, opacity }) => {
+      const peakOpacity = opacity || 0.85;
+      const screenH = window.innerHeight;
+      const screenW = window.innerWidth;
+      const pool = messages || ['记得休息。'];
+
+      const totalCount = 500;
+      let removedCount = 0;
+
+      // Create multiple columns across the screen
+      const columns = 8;
+      const colWidth = screenW / columns;
+
+      for (let i = 0; i < totalCount; i++) {
+        const delay = i * (duration * 0.5 / totalCount) + Math.random() * 1200;
+        setTimeout(() => {
+          const el = document.createElement('div');
+          el.className = 'rain-word';
+          el.textContent = pool[Math.floor(Math.random() * pool.length)];
+
+          const col = Math.floor(Math.random() * columns);
+          const x = col * colWidth + Math.random() * colWidth * 0.8 + colWidth * 0.1;
+          el.style.left = x + 'px';
+          el.style.top = (-30 + Math.random() * 50) + 'px';
+          const fallDuration = 3.5 + Math.random() * 5;
+          el.style.setProperty('--fall-duration', fallDuration + 's');
+          el.style.setProperty('--fall-distance', (screenH + 80) + 'px');
+          el.style.setProperty('--peak-opacity', peakOpacity);
+          el.style.fontSize = (18 + Math.random() * 14) + 'px';
+
+          const colors = [
+            'rgba(129, 140, 248, 0.85)',
+            'rgba(244, 114, 182, 0.85)',
+            'rgba(167, 139, 250, 0.8)',
+            'rgba(147, 197, 253, 0.75)',
+            'rgba(134, 239, 172, 0.7)',
+            'rgba(253, 230, 138, 0.75)',
+            'rgba(251, 146, 160, 0.8)',
+            'rgba(196, 181, 253, 0.8)'
+          ];
+          el.style.color = colors[Math.floor(Math.random() * colors.length)];
+
+          document.body.appendChild(el);
+
+          // Remove after animation finishes + buffer
+          const removeDelay = (fallDuration + 1) * 1000;
+          setTimeout(() => {
+            el.remove();
+            removedCount++;
+            // Close window when all rain has finished
+            if (removedCount >= totalCount) {
+              setTimeout(() => window.close(), 500);
+            }
+          }, removeDelay);
+        }, delay);
+      }
+    });
+  </script>
+</body>
+</html>

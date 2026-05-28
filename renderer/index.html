@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title> </title>
+  <link rel="stylesheet" href="styles/main.css">
+</head>
+<body>
+  <div id="pet-container">
+    <!-- 颜文字主体 -->
+    <div id="pet-display">
+      <div id="kaomoji"></div>
+      <div id="particles-container"></div>
+    </div>
+
+    <!-- 底部区域（默认隐藏，hover颜文字时显示） -->
+    <div id="bottom-section">
+      <span id="pet-name">小猫咪</span>
+    </div>
+
+    <!-- 右键菜单 -->
+    <div id="context-menu" class="hidden">
+      <div class="ctx-item" data-ctx="rename">改名</div>
+      <div class="ctx-separator"></div>
+      <div class="ctx-item" data-ctx="save">存档</div>
+      <div class="ctx-item ctx-danger" data-ctx="exit">退出</div>
+    </div>
+
+    <!-- 通知 Toast -->
+    <div id="toast-container"></div>
+
+    <!-- 状态气泡（绝对定位，不影响布局） -->
+    <div id="speech-bubble" class="hidden">
+      <span id="bubble-text"></span>
+      <span id="bubble-decode-btn" class="hidden">[?]</span>
+      <div id="bubble-original"></div>
+    </div>
+  </div>
+
+  <!-- Data files -->
+  <script src="scripts/data/schemas.js"></script>
+  <script src="scripts/data/expressions.js"></script>
+  <script src="scripts/data/animations.js"></script>
+  <script src="scripts/data/evolutions.js"></script>
+  <script src="scripts/data/particles.js"></script>
+  <script src="scripts/data/language.js"></script>
+  <script src="scripts/data/colors.js"></script>
+  <script src="scripts/data/reactions.js"></script>
+  <script src="scripts/data/activities.js"></script>
+  <script src="scripts/data/speech-states.js"></script>
+  <script src="scripts/data/care-messages.js"></script>
+  <!-- Config -->
+  <script src="scripts/config.js"></script>
+  <!-- Registry -->
+  <script src="scripts/registry.js"></script>
+  <!-- Core modules -->
+  <script src="scripts/system-monitor.js"></script>
+  <script src="scripts/hidden-state.js"></script>
+  <script src="scripts/renderer.js"></script>
+  <script src="scripts/behavior-engine.js"></script>
+  <script src="scripts/save-manager.js"></script>
+  <script src="scripts/pet.js"></script>
+  <script src="scripts/scheduler.js"></script>
+  <script src="scripts/app.js"></script>
+</body>
+</html>
