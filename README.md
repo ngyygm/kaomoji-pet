@@ -37,6 +37,12 @@ npm start
 npm run build:win
 ```
 
+## Design Document / 设计文档
+
+See [BLUEPRINT.md](BLUEPRINT.md) for the full design spec of the hidden state system, behavior engine, and interaction model.
+
+详见 [BLUEPRINT.md](BLUEPRINT.md)，包含隐藏状态系统、行为引擎、交互模型等完整设计文档。
+
 ## Tech Stack / 技术栈
 
 - Electron — Desktop application framework
