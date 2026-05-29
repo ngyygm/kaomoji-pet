@@ -41,9 +41,6 @@ class BehaviorEngine {
     }
     this._prevHour = currentHour;
 
-    // Update expression
-    this._updateExpression(state);
-
     // Maybe speak
     this._maybeSpeak(state, sys, now);
 
@@ -52,11 +49,6 @@ class BehaviorEngine {
 
     // Check easter eggs
     this._checkEasterEggs(state, sys, now);
-  }
-
-  _updateExpression(state) {
-    const mood = this.hiddenState.getDominantMood();
-    this.renderer.updateKaomoji(mood, 'adult');
   }
 
   _maybeSpeak(state, sys, now) {
@@ -311,7 +303,7 @@ class BehaviorEngine {
         this.renderer.setAnimationOverride('surprised', 3000);
         break;
       case 'giant_face':
-        window.petAPI.prankGiant('(=^・ω・^=)', 4000);
+        window.petAPI.prankGiant(null, 4000);
         break;
       case 'care_rain':
         this._showBubble(pickRandomSpeech('stressed_concern'), 4000);
@@ -364,10 +356,10 @@ class BehaviorEngine {
 
     // Different effects based on mischief level
     if (state.mischief > 0.4) {
-      // Giant face easter egg
-      const colors = ['#f9a8d4', '#818cf8', '#f87171', '#86efac', '#fde68a'];
+      // Giant face easter egg — prank-giant.html now picks random kaomoji & color
+      const colors = ['#f9a8d4', '#818cf8', '#f87171', '#86efac', '#fde68a', '#c084fc', '#fb923c', '#f472b6', '#a3e635'];
       const color = colors[Math.floor(Math.random() * colors.length)];
-      window.petAPI.easterEggGiant('(=^・ω・^=)', color, 3500);
+      window.petAPI.easterEggGiant(null, color, 3500);
       this.renderer.setAnimationOverride('surprised', 3000);
     } else {
       // Mini burst: particles + surprised expression even at low mischief
@@ -384,10 +376,10 @@ class BehaviorEngine {
 
     const effects = [
       () => {
-        // Giant face
-        const colors = ['#f9a8d4', '#818cf8', '#f87171', '#86efac', '#fde68a'];
+        // Giant face — random kaomoji & color handled by prank-giant.html
+        const colors = ['#f9a8d4', '#818cf8', '#f87171', '#86efac', '#fde68a', '#c084fc', '#fb923c', '#e879f9', '#67e8f9'];
         const color = colors[Math.floor(Math.random() * colors.length)];
-        window.petAPI.easterEggGiant('(=^・ω・^=)', color, 3500);
+        window.petAPI.easterEggGiant(null, color, 3500);
         this.renderer.setAnimationOverride('surprised', 3000);
       },
       () => {

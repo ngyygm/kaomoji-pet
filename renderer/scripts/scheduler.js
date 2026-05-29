@@ -41,10 +41,9 @@ class GameLoop {
       this.saveManager.saveFull(this.petState, this.hiddenState.getState());
     }
 
-    // Update kaomoji display based on hidden state (unless animation override active)
-    if (!this.renderer.idleController.override) {
-      const mood = this.hiddenState.getDominantMood();
-      this.renderer.updateKaomoji(mood, 'adult');
+    // Micro-expression tick (Layer 2) — only during idle, no full expression refresh
+    if (!this.renderer.idleController.override && !this.renderer.isFullExpression) {
+      this.renderer.microExpressionTick();
     }
 
     // Update pet name display

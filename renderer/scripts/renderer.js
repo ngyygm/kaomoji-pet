@@ -34,7 +34,15 @@ class PetRenderer {
     this._pendingCssClass = null;
     this._resizeDebounce = null;
     this._isSleeping = false;
+
+    // Micro-expression state
+    this._isFullExpression = false;
+    this._microTimer = null;
+    this._lastMicroTime = 0;
+    this._segmentAnimator = new SegmentAnimator(this);
   }
+
+  get isFullExpression() { return this._isFullExpression; }
 
   // === Expression Transition (Scale-Fade-Morph) ===
 
@@ -63,6 +71,27 @@ class PetRenderer {
     const newRect = el.getBoundingClientRect();
     const newWidth = newRect.width;
     const newHeight = newRect.height;
+
+    // Full-expression pop effect
+    if (this._isFullExpression) {
+      el.style.transform = 'scale(1.15)';
+      el.style.opacity = '0.8';
+      el.offsetHeight;
+      el.style.transition = 'transform 0.3s cubic-bezier(0.34,1.56,0.64,1), opacity 0.2s ease, color 1.5s ease, text-shadow 1.5s ease';
+      el.style.transform = 'scale(1)';
+      el.style.opacity = '1';
+
+      if (this._transitionCleanup) clearTimeout(this._transitionCleanup);
+      this._transitionCleanup = setTimeout(() => {
+        el.style.transform = '';
+        el.style.transition = '';
+        if (this._pendingCssClass) {
+          el.classList.add(this._pendingCssClass);
+          this._pendingCssClass = null;
+        }
+      }, 350);
+      return;
+    }
 
     if (Math.abs(newWidth - oldWidth) < 3 && Math.abs(newHeight - oldHeight) < 3) {
       el.style.transition = '';
@@ -178,6 +207,85 @@ class PetRenderer {
     this.renderSegmentedKaomoji(this.currentStage);
   }
 
+  // === Base State ===
+
+  resetToBase() {
+    const base = {
+      'seg-deco-l': '', 'seg-arm-l': '',
+      'seg-bound-l': '(', 'seg-eye-l': '·',
+      'seg-mouth': 'ω',
+      'seg-eye-r': '·', 'seg-bound-r': ')',
+      'seg-arm-r': '', 'seg-deco-r': ''
+    };
+    for (const [cls, text] of Object.entries(base)) {
+      const el = this.kaomojiEl.querySelector('.' + cls);
+      if (!el) continue;
+      el.textContent = text;
+      el.style.display = text ? 'inline-block' : 'none';
+    }
+    this._isFullExpression = false;
+  }
+
+  // === Micro-Expression System (Layer 2) ===
+
+  microExpressionTick() {
+    const now = Date.now();
+    if (now - this._lastMicroTime < 5000) return;
+    if (this._microTimer) return;
+    if (Math.random() > 0.3) return;
+
+    this._lastMicroTime = now;
+
+    const categories = ['eyes', 'mouths', 'arms', 'deco', 'particle'];
+    const pick = categories[Math.floor(Math.random() * categories.length)];
+
+    if (pick === 'particle') {
+      const types = ['sparkle', 'note', 'heart', 'star'];
+      this.spawnParticles(types[Math.floor(Math.random() * types.length)], 2);
+      return;
+    }
+
+    const pool = MICRO_EXPRESSIONS[pick];
+    if (!pool || pool.length === 0) return;
+    const choice = pool[Math.floor(Math.random() * pool.length)];
+
+    this.resetToBase();
+
+    if (pick === 'eyes') {
+      const elL = this.kaomojiEl.querySelector('.seg-eye-l');
+      const elR = this.kaomojiEl.querySelector('.seg-eye-r');
+      if (elL) { elL.textContent = choice.eyes[0]; elL.style.display = 'inline-block'; }
+      if (elR) { elR.textContent = choice.eyes[1]; elR.style.display = 'inline-block'; }
+      this._segmentAnimator.play('seg-eye-l', 'eye', choice.anim || 'transition');
+      this._segmentAnimator.play('seg-eye-r', 'eye', choice.anim || 'transition');
+    } else if (pick === 'mouths') {
+      const el = this.kaomojiEl.querySelector('.seg-mouth');
+      if (el) { el.textContent = choice.mouth; el.style.display = 'inline-block'; }
+      this._segmentAnimator.play('seg-mouth', 'mouth', choice.anim || 'transition');
+    } else if (pick === 'arms') {
+      const elL = this.kaomojiEl.querySelector('.seg-arm-l');
+      const elR = this.kaomojiEl.querySelector('.seg-arm-r');
+      if (elL && choice.arms[0]) { elL.textContent = choice.arms[0]; elL.style.display = 'inline-block'; }
+      if (elR && choice.arms[1]) { elR.textContent = choice.arms[1]; elR.style.display = 'inline-block'; }
+      this._segmentAnimator.play('seg-arm-l', 'arm', choice.armAnimL || choice.anim || 'appear');
+      this._segmentAnimator.play('seg-arm-r', 'arm', choice.armAnimR || choice.anim || 'appear');
+    } else if (pick === 'deco') {
+      const elL = this.kaomojiEl.querySelector('.seg-deco-l');
+      const elR = this.kaomojiEl.querySelector('.seg-deco-r');
+      if (elL && choice.deco[0]) { elL.textContent = choice.deco[0]; elL.style.display = 'inline-block'; }
+      if (elR && choice.deco[1]) { elR.textContent = choice.deco[1]; elR.style.display = 'inline-block'; }
+      this._segmentAnimator.play('seg-deco-l', 'deco', choice.anim || 'appear');
+      this._segmentAnimator.play('seg-deco-r', 'deco', choice.anim || 'appear');
+    }
+
+    const duration = 2000 + Math.random() * 2000;
+    this._microTimer = setTimeout(() => {
+      this._microTimer = null;
+      this.resetToBase();
+      this.measureAndResize();
+    }, duration);
+  }
+
   // === Core Kaomoji Display ===
 
   applyMoodColor(mood) {
@@ -191,41 +299,127 @@ class PetRenderer {
   updateKaomoji(mood, stage) {
     if (this.idleController.override) return;
 
-    this.transitionToContent(() => {
-      this.renderSegmentedKaomoji(stage);
-      const moodEffects = petData.getMoodEffects(mood);
-      for (const e of moodEffects) {
-        this.applyEffect(e);
-      }
-    });
+    // Try preset expressions first (from kaomoji-parts.js)
+    const presetMap = typeof resolveMoodPreset === 'function' ? resolveMoodPreset(mood) : null;
+    if (presetMap) {
+      this.transitionToContent(() => {
+        this.renderSegmentedKaomoji(stage);
+        this._applyPresetMap(presetMap);
+      });
+    } else {
+      // Fallback to legacy MOOD_EXPRESSIONS
+      this.transitionToContent(() => {
+        this.renderSegmentedKaomoji(stage);
+        const moodEffects = petData.getMoodEffects(mood);
+        for (const e of moodEffects) {
+          this.applyEffect(e);
+        }
+      });
+    }
 
     this.applyMoodColor(mood);
     this.currentAnimation = mood;
+  }
+
+  applyPresetExpression(presetName, duration) {
+    const presetMap = typeof resolvePreset === 'function' ? resolvePreset(presetName) : null;
+    if (!presetMap) return;
+
+    this.transitionToContent(() => {
+      this.renderSegmentedKaomoji(this.currentStage);
+      this._applyPresetMap(presetMap);
+    });
+
+    if (duration > 0) {
+      if (this.effectTimer) clearTimeout(this.effectTimer);
+      this.effectTimer = setTimeout(() => {
+        this.renderSegmentedKaomoji(this.currentStage);
+      }, duration);
+    }
+  }
+
+  _applyPresetMap(segMap, animate = false) {
+    const groupMap = {
+      'seg-eye-l': 'eye', 'seg-eye-r': 'eye',
+      'seg-mouth': 'mouth',
+      'seg-arm-l': 'arm', 'seg-arm-r': 'arm',
+      'seg-deco-l': 'deco', 'seg-deco-r': 'deco',
+      'seg-bound-l': 'bound', 'seg-bound-r': 'bound'
+    };
+    for (const [cls, text] of Object.entries(segMap)) {
+      const el = this.kaomojiEl.querySelector('.' + cls);
+      if (!el) continue;
+      const prevText = el.textContent;
+      if (text) {
+        el.textContent = text;
+        el.style.display = 'inline-block';
+      } else {
+        el.textContent = '';
+        el.style.display = 'none';
+      }
+      if (animate && text && text !== prevText) {
+        const group = groupMap[cls];
+        const animType = this._inferAnimType(group, text, !prevText);
+        this._segmentAnimator.play(cls, group, animType);
+      }
+    }
+  }
+
+  _inferAnimType(group, text, isNew) {
+    if (isNew) return 'appear';
+    switch (group) {
+      case 'eye':
+        if ('O○⊙◉'.includes(text)) return 'surprised';
+        if (text === '-' || text === '─' || text === '−') return 'wink';
+        if (text === '>' || text === '<') return 'glare';
+        return 'transition';
+      case 'mouth':
+        if ('O口▽'.includes(text)) return 'open';
+        if (text === '3') return 'cat';
+        return 'transition';
+      case 'arm':
+        if ('ヽヾψΨ'.includes(text)) return 'wave';
+        if (text === '凸') return 'point';
+        return 'appear';
+      case 'deco': return 'appear';
+      case 'bound': return 'transition';
+      default: return 'transition';
+    }
   }
 
   setAnimationOverride(animType, duration) {
     if (this.animTimer) { clearInterval(this.animTimer); this.animTimer = null; }
     if (this.effectTimer) { clearTimeout(this.effectTimer); this.effectTimer = null; }
     if (this.overrideTimer) { clearTimeout(this.overrideTimer); this.overrideTimer = null; }
+    if (this._microTimer) { clearTimeout(this._microTimer); this._microTimer = null; }
 
     this.currentAnimation = animType;
     this.idleController.override = true;
+    this._isFullExpression = true;
     this.applyMoodColor(animType);
     this._pendingCssClass = null;
 
     // Always use segmented system — reset template, then apply effects
     this.transitionToContent(() => {
       this.renderSegmentedKaomoji(this.currentStage);
-      const combo = petData.getCombo(animType);
-      if (combo) {
-        const effectList = combo.effects || combo;
-        for (const e of effectList) {
-          this.applyEffect(e);
-        }
+
+      // Try preset first
+      const presetMap = typeof resolveMoodPreset === 'function' ? resolveMoodPreset(animType) : null;
+      if (presetMap) {
+        this._applyPresetMap(presetMap, true);
       } else {
-        const moodEffects = petData.getMoodEffects(animType);
-        for (const e of moodEffects) {
-          this.applyEffect(e);
+        // Fallback: try combo then mood effects
+        const combo = petData.getCombo(animType);
+        if (combo) {
+          const effectList = combo.effects || combo;
+          for (const e of effectList) {
+            this.applyEffect(e);
+          }
+        } else {
+          const moodEffects = petData.getMoodEffects(animType);
+          for (const e of moodEffects) {
+            this.applyEffect(e);
+          }
         }
       }
     });
@@ -603,6 +797,12 @@ class NaturalBlink {
     const eyeR = el.querySelector('.seg-eye-r');
     if (!eyeL || !eyeR) { this._scheduleNext(); return; }
 
+    // Only blink when eyes are in default neutral state ('·')
+    if (eyeL.textContent !== '·' || eyeR.textContent !== '·') {
+      this._scheduleNext();
+      return;
+    }
+
     this.blinking = true;
     this._savedEyes = { l: eyeL.textContent, r: eyeR.textContent };
 
@@ -688,5 +888,104 @@ class ScreenWalker {
 
     // Play appear animation
     this.renderer.playJumpAppear();
+  }
+}
+
+// === Micro-expression definitions ===
+
+const MICRO_EXPRESSIONS = {
+  eyes: [
+    { eyes: ['^', '^'], anim: 'transition' },
+    { eyes: ['~', '~'], anim: 'transition' },
+    { eyes: ['●', '●'], anim: 'transition' },
+    { eyes: ['✧', '✧'], anim: 'transition' },
+    { eyes: ['°', '°'], anim: 'transition' },
+  ],
+  mouths: [
+    { mouth: '▽', anim: 'transition' },
+    { mouth: '3', anim: 'cat' },
+    { mouth: 'ᴗ', anim: 'transition' },
+    { mouth: '∇', anim: 'transition' },
+    { mouth: 'O', anim: 'open' },
+  ],
+  arms: [
+    { arms: ['ヽ', 'ﾉ'], anim: 'appear', armAnimL: 'wave', armAnimR: 'wave' },
+    { arms: ['o', 'o'], anim: 'appear' },
+    { arms: ['凸', ''], anim: 'appear', armAnimL: 'point' },
+  ],
+  deco: [
+    { deco: ['☆', '☆'], anim: 'appear' },
+    { deco: ['♡', '♡'], anim: 'appear' },
+    { deco: ['♪', '♪'], anim: 'appear' },
+  ]
+};
+
+// === Segment Animation Engine ===
+
+class SegmentAnimator {
+  static ANIMS = {
+    eye: {
+      transition: { from: 'scale(1.3)', to: 'scale(1)', duration: 200, easing: 'ease-out' },
+      surprised:  { from: 'scale(1.5)', to: 'scale(1)', duration: 200, easing: 'cubic-bezier(0.34,1.56,0.64,1)' },
+      wink:       { from: 'scaleY(0.2)', to: 'scaleY(1)', duration: 150, easing: 'ease-out' },
+      glare:      { frames: [
+        { transform: 'translateX(0)' },
+        { transform: 'translateX(3px)' },
+        { transform: 'translateX(-2px)' },
+        { transform: 'translateX(0)' }
+      ], duration: 200 },
+    },
+    mouth: {
+      transition: { from: 'scaleY(1.4)', to: 'scaleY(1)', duration: 200, easing: 'ease-out' },
+      open:       { from: 'scale(1.3)', to: 'scale(1)', duration: 250, easing: 'cubic-bezier(0.34,1.56,0.64,1)' },
+      cat:        { from: 'rotate(8deg) scale(1.1)', to: 'rotate(0deg) scale(1)', duration: 200, easing: 'ease-out' },
+    },
+    arm: {
+      appear:     { from: 'scale(0)', to: 'scale(1)', duration: 300, easing: 'cubic-bezier(0.34,1.56,0.64,1)' },
+      wave:       { frames: [
+        { transform: 'rotate(0deg)' },
+        { transform: 'rotate(20deg)' },
+        { transform: 'rotate(-10deg)' },
+        { transform: 'rotate(15deg)' },
+        { transform: 'rotate(0deg)' }
+      ], duration: 500 },
+      point:      { from: 'translateX(-5px) scale(0.8)', to: 'translateX(0) scale(1)', duration: 250, easing: 'cubic-bezier(0.34,1.56,0.64,1)' },
+    },
+    deco: {
+      appear:     { from: 'scale(0.3) opacity(0.3)', to: 'scale(1) opacity(1)', duration: 300, easing: 'ease-out' },
+    },
+    bound: {
+      transition: { from: 'scale(1.1)', to: 'scale(1)', duration: 150, easing: 'ease-out' },
+    }
+  };
+
+  constructor(renderer) {
+    this.renderer = renderer;
+  }
+
+  play(segClass, group, animType) {
+    const el = this.renderer.kaomojiEl.querySelector('.' + segClass);
+    if (!el) return;
+
+    const groupAnims = SegmentAnimator.ANIMS[group];
+    if (!groupAnims) return;
+
+    const config = groupAnims[animType] || groupAnims['transition'];
+    if (!config) return;
+
+    if (config.frames) {
+      el.animate(config.frames, {
+        duration: config.duration || 200,
+        easing: config.easing || 'ease-out'
+      });
+    } else {
+      el.animate([
+        { transform: config.from },
+        { transform: config.to }
+      ], {
+        duration: config.duration || 200,
+        easing: config.easing || 'ease-out'
+      });
+    }
   }
 }

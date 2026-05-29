@@ -136,6 +136,18 @@ const ACTIVITIES = {
     ]
   },
 
+  kaomoji_react: {
+    description: '颜文字反应：随机弹出颜文字表达心情',
+    trigger: {},
+    probability: 0.10,
+    steps: [
+      { delay: 0,    action: 'idleStop' },
+      { delay: 0,    action: 'kaomojiReact', params: { duration: 4000 } },
+      { delay: 0,    action: 'particles', params: { type: 'sparkle', count: 1 } },
+      { delay: 4500, action: 'idleStart' }
+    ]
+  },
+
   prank_giant: {
     description: '全屏捣蛋：放大颜文字占满屏幕（稀有）',
     trigger: { cooldown: 1800000, minHappiness: 60 },

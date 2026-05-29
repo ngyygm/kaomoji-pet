@@ -23,6 +23,8 @@ class PetDataRegistry {
     this._activities = typeof ACTIVITIES !== 'undefined' ? ACTIVITIES : {};
     this._stageSegments = typeof STAGE_SEGMENTS !== 'undefined' ? STAGE_SEGMENTS : {};
     this._segmentGroups = typeof SEGMENT_GROUPS !== 'undefined' ? SEGMENT_GROUPS : {};
+    this._kaomojiByMood = typeof KAOMOJI_BY_MOOD !== 'undefined' ? KAOMOJI_BY_MOOD : {};
+    this._kaomojiPhrasesZh = typeof KAOMOJI_PHRASES_ZH !== 'undefined' ? KAOMOJI_PHRASES_ZH : {};
   }
 
   // --- Effects ---
@@ -84,6 +86,33 @@ class PetDataRegistry {
       pool = pool.filter(p => p.category === category);
     }
     if (pool.length === 0) pool = this._phrases;
+    return pool[Math.floor(Math.random() * pool.length)];
+  }
+
+  getRandomKaomoji(mood) {
+    const moodMap = {
+      happy: 'happy', love: 'love', hungry: 'cute', sleepy: 'sleepy',
+      angry: 'angry', sad: 'sad', surprised: 'surprised', playing: 'wink',
+      greeting: 'happy', normal: 'cute', curious: 'cute', confused: 'sad',
+      stressed: 'scared', drowsy: 'sleepy', shy: 'shy', smug: 'cool',
+      satisfied: 'happy', alert: 'surprised', crying: 'sad', love: 'love'
+    };
+    const category = moodMap[mood] || 'cute';
+    const pool = this._kaomojiByMood[category] || this._kaomojiByMood.cute || [];
+    if (pool.length === 0) return '(・ω・)';
+    return pool[Math.floor(Math.random() * pool.length)];
+  }
+
+  getRandomKaomojiPhrase(mood) {
+    const moodMap = {
+      happy: 'happy', love: 'love', hungry: 'cute', sleepy: 'sleepy',
+      angry: 'angry', sad: 'sad', surprised: 'surprised', playing: 'wink',
+      greeting: 'happy', normal: 'happy', curious: 'surprised',
+      stressed: 'encourage', drowsy: 'sleepy', shy: 'shy', smug: 'cool'
+    };
+    const category = moodMap[mood] || 'happy';
+    const pool = this._kaomojiPhrasesZh[category] || this._kaomojiPhrasesZh.happy || [];
+    if (pool.length === 0) return null;
     return pool[Math.floor(Math.random() * pool.length)];
   }
 
@@ -300,6 +329,25 @@ class ActivityRunner {
         const phrase = this.registry.getRandomPhrase();
         this.renderer.showKaomojiBubble(phrase, params.duration || 5000);
         this.renderer.setAnimationOverride(phrase.mood, 3000);
+        break;
+      }
+
+      case 'kaomojiReact': {
+        const mood = params.mood || 'happy';
+        const usePhrase = Math.random() > 0.5;
+        if (usePhrase) {
+          const zhPhrase = this.registry.getRandomKaomojiPhrase(mood);
+          if (zhPhrase) {
+            this.renderer.showBubble(zhPhrase, params.duration || 4000);
+          } else {
+            const km = this.registry.getRandomKaomoji(mood);
+            this.renderer.showBubble(km, params.duration || 4000);
+          }
+        } else {
+          const km = this.registry.getRandomKaomoji(mood);
+          this.renderer.showBubble(km, params.duration || 4000);
+        }
+        this.renderer.setAnimationOverride(mood, 3000);
         break;
       }
 

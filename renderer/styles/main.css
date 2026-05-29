@@ -369,6 +369,31 @@ html, body {
   padding: 0 0.1em;
 }
 
+/* Arm segments — smaller font, auto-hide when empty */
+#kaomoji .seg-arm-l,
+#kaomoji .seg-arm-r {
+  font-size: 0.85em;
+  vertical-align: middle;
+  transition: opacity 0.2s ease, transform 0.3s ease;
+}
+#kaomoji .seg-arm-l:empty,
+#kaomoji .seg-arm-r:empty {
+  display: none;
+}
+
+/* Decoration segments — sparkle effect, auto-hide when empty */
+#kaomoji .seg-deco-l,
+#kaomoji .seg-deco-r {
+  font-size: 0.7em;
+  vertical-align: super;
+  opacity: 0.9;
+  transition: opacity 0.3s ease;
+}
+#kaomoji .seg-deco-l:empty,
+#kaomoji .seg-deco-r:empty {
+  display: none;
+}
+
 #kaomoji .seg-arm-l.pulse, #kaomoji .seg-arm-r.pulse,
 #kaomoji .seg-eye-l.pulse, #kaomoji .seg-eye-r.pulse,
 #kaomoji .seg-mouth.pulse, #kaomoji .seg-ear-l.pulse, #kaomoji .seg-ear-r.pulse {

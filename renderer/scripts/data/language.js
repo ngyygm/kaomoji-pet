@@ -79,3 +79,26 @@ const KAOMOJI_PHRASES = [
   { text: 'FUN', mood: 'playing', category: 'emotion', description: '表达好玩' },
   { text: 'FOOD', mood: 'hungry', category: 'need', description: '表达想吃东西' }
 ];
+
+// Full kaomoji phrases — randomly picked from KAOMOJI_BY_MOOD when speak_kaomoji triggers
+if (typeof KAOMOJI_BY_MOOD !== 'undefined') {
+  const moodMap = {
+    happy: 'happy', love: 'love', hungry: 'cute', sleepy: 'sleepy',
+    angry: 'angry', sad: 'sad', surprised: 'surprised', playing: 'wink',
+    greeting: 'happy', normal: 'cute', curious: 'cute', confused: 'sad',
+    stressed: 'scared', drowsy: 'sleepy', shy: 'shy', smug: 'cool'
+  };
+
+  function pickRandomKaomoji(mood) {
+    const category = moodMap[mood] || 'cute';
+    const pool = KAOMOJI_BY_MOOD[category] || KAOMOJI_BY_MOOD.cute;
+    return pool[Math.floor(Math.random() * pool.length)];
+  }
+
+  function pickRandomKaomojiPhrase(mood) {
+    if (typeof KAOMOJI_PHRASES_ZH === 'undefined') return null;
+    const category = moodMap[mood] || 'happy';
+    const pool = KAOMOJI_PHRASES_ZH[category] || KAOMOJI_PHRASES_ZH.happy;
+    return pool[Math.floor(Math.random() * pool.length)];
+  }
+}
