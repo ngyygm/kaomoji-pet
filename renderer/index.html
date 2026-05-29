@@ -10,6 +10,12 @@
   <div id="pet-container">
     <!-- 颜文字主体 -->
     <div id="pet-display">
+      <!-- 气泡定位基准是 pet-display，始终在颜文字正上方 -->
+      <div id="speech-bubble" class="hidden">
+        <span id="bubble-text"></span>
+        <span id="bubble-decode-btn" class="hidden">[?]</span>
+        <div id="bubble-original"></div>
+      </div>
       <div id="kaomoji"></div>
       <div id="particles-container"></div>
     </div>
@@ -29,13 +35,6 @@
 
     <!-- 通知 Toast -->
     <div id="toast-container"></div>
-
-    <!-- 状态气泡（绝对定位，不影响布局） -->
-    <div id="speech-bubble" class="hidden">
-      <span id="bubble-text"></span>
-      <span id="bubble-decode-btn" class="hidden">[?]</span>
-      <div id="bubble-original"></div>
-    </div>
   </div>
 
   <!-- Data files -->

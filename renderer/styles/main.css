@@ -39,7 +39,7 @@ html, body {
 /* Speech Bubble */
 #speech-bubble {
   position: absolute;
-  top: 5px;
+  bottom: calc(100% + 8px);
   left: 50%;
   transform: translateX(-50%);
   background: rgba(255, 255, 255, 0.92);
@@ -69,7 +69,7 @@ html, body {
 }
 
 @keyframes bubbleIn {
-  from { opacity: 0; transform: translateX(-50%) translateY(-8px) scale(0.95); }
+  from { opacity: 0; transform: translateX(-50%) translateY(8px) scale(0.95); }
   to { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
 }
 
