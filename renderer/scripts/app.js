@@ -182,9 +182,9 @@ document.addEventListener('DOMContentLoaded', () => {
   document.body.addEventListener('mousemove', (e) => {
     const el = document.elementFromPoint(e.clientX, e.clientY);
     const interactive = el && (
-      el.id === 'kaomoji' ||
-      el.id === 'pet-display' ||
-      el.id === 'pet-container' ||
+      el.closest('#kaomoji') ||
+      el.closest('#pet-display') ||
+      el.closest('#pet-container') ||
       el.closest('#context-menu') ||
       el.closest('#speech-bubble') ||
       el.closest('#bottom-section')

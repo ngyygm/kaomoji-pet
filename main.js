@@ -249,6 +249,7 @@ function generateCurvePath(sx, sy, tx, ty, type) {
 
 ipcMain.on('move-window-to', (event, { targetX, targetY, curveType, step }) => {
   if (!mainWindow || mainWindow.isDestroyed()) return;
+  if (typeof targetX !== 'number' || typeof targetY !== 'number' || isNaN(targetX) || isNaN(targetY)) return;
   if (moveAnimTimer) { clearInterval(moveAnimTimer); moveAnimTimer = null; }
 
   // Handle legacy 'step' parameter for jump (large number = instant)
