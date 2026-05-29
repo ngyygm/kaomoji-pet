@@ -177,4 +177,18 @@ class App {
 document.addEventListener('DOMContentLoaded', () => {
   const app = new App();
   app.init();
+
+  // Hit-test: only capture mouse on non-transparent pixels
+  document.body.addEventListener('mousemove', (e) => {
+    const el = document.elementFromPoint(e.clientX, e.clientY);
+    const interactive = el && (
+      el.id === 'kaomoji' ||
+      el.id === 'pet-display' ||
+      el.id === 'pet-container' ||
+      el.closest('#context-menu') ||
+      el.closest('#speech-bubble') ||
+      el.closest('#bottom-section')
+    );
+    window.petAPI.setIgnoreMouseEvents(!interactive, { forward: true });
+  });
 });

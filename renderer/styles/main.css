@@ -25,6 +25,7 @@ html, body {
   display: flex;
   flex-direction: column;
   align-items: center;
+  justify-content: flex-end;
 }
 
 /* Interactive elements: no drag */
@@ -76,8 +77,8 @@ html, body {
 #pet-display {
   position: relative;
   width: 100%;
-  min-height: 80px;
-  margin-top: 40px;
+  min-height: 50px;
+  margin-bottom: 8px;
   display: flex;
   align-items: center;
   justify-content: center;

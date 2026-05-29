@@ -39,6 +39,9 @@ function createMainWindow() {
   mainWindow.loadFile(path.join(__dirname, 'renderer', 'index.html'));
   mainWindow.setVisibleOnAllWorkspaces(true);
 
+  // Let transparent pixels pass through mouse clicks to windows below
+  mainWindow.setIgnoreMouseEvents(true, { forward: true });
+
   mainWindow.once('ready-to-show', () => {
     mainWindow.show();
   });
@@ -312,8 +315,25 @@ ipcMain.handle('get-window-size', () => {
   return null;
 });
 
-ipcMain.on('resize-window', (event, { width, height }) => {
-  // Window is fixed-size, ignore resize requests
+ipcMain.on('resize-window', (event, { width, height, expandUp }) => {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    if (expandUp) {
+      // Expand upward: keep bottom edge fixed, grow window upward
+      const [oldW, oldH] = mainWindow.getSize();
+      const [x, y] = mainWindow.getPosition();
+      const newH = Math.round(height);
+      const dy = newH - oldH;
+      mainWindow.setBounds({ x, y: y - dy, width: Math.round(width), height: newH });
+    } else {
+      mainWindow.setSize(Math.round(width), Math.round(height));
+    }
+  }
+});
+
+ipcMain.on('set-ignore-mouse', (event, { ignore, options }) => {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.setIgnoreMouseEvents(ignore, options || {});
+  }
 });
 
 // Rename dialog — opens a separate small window so main window stays frameless
