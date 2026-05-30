@@ -126,6 +126,12 @@ class App {
         this.hideContextMenu();
         const action = item.dataset.ctx;
         if (action === 'rename') this.showNameDialog();
+        else if (action === 'fx-billiard') window.petAPI.triggerBilliard(9000);
+        else if (action === 'fx-rain') window.petAPI.triggerCareRain(
+          typeof CARE_MESSAGES !== 'undefined' ? CARE_MESSAGES : ['休息一下。', '我在陪着你。'],
+          10000, 0.75
+        );
+        else if (action === 'fx-giant') window.petAPI.easterEggGiant(null, null, 4000);
         else if (action === 'save') {
           this.saveManager.saveFull(this.petState, this.hiddenState.getState());
           this.renderer.showToast('存档成功！', 'success');
@@ -138,30 +144,6 @@ class App {
   setupIPCListeners() {
     window.petAPI.onAppClosing(() => {
       this.saveManager.saveFull(this.petState, this.hiddenState.getState());
-    });
-
-    // Secret keyboard triggers
-    const TRIGGERS = {
-      'tantiao': () => window.petAPI.triggerBilliard(9000),
-      'caiyu': () => window.petAPI.triggerCareRain(
-        typeof CARE_MESSAGES !== 'undefined' ? CARE_MESSAGES : ['休息一下。', '我在陪着你。'],
-        10000, 0.75
-      ),
-    };
-    let keyBuffer = '';
-    const maxLen = Math.max(...Object.keys(TRIGGERS).map(k => k.length));
-
-    document.addEventListener('keydown', (e) => {
-      if (e.key.length !== 1) return;
-      keyBuffer += e.key.toLowerCase();
-      if (keyBuffer.length > maxLen) keyBuffer = keyBuffer.slice(-maxLen);
-      for (const [seq, fn] of Object.entries(TRIGGERS)) {
-        if (keyBuffer.endsWith(seq)) {
-          keyBuffer = '';
-          fn();
-          break;
-        }
-      }
     });
   }
 
