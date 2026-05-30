@@ -175,6 +175,21 @@
       30% { opacity: 1; }
       100% { opacity: 0; transform: translate(var(--tx), var(--ty)) scale(1.5); }
     }
+
+    /* === Rainbow cycling === */
+    .rainbow {
+      background: linear-gradient(90deg,
+        #f9a8d4, #818cf8, #67e8f9, #86efac, #fde68a,
+        #fb923c, #f87171, #e879f9, #f9a8d4);
+      background-size: 200% 100%;
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      animation: rainbowSlide 1.2s linear infinite;
+    }
+    @keyframes rainbowSlide {
+      0% { background-position: 0% 50%; }
+      100% { background-position: 200% 50%; }
+    }
   </style>
 </head>
 <body>
@@ -232,25 +247,35 @@
     ipcRenderer.on('show-giant', (event, { kaomoji, color }) => {
       const el = document.getElementById('giant');
       const km = kaomoji || pick(KAOMOJI_POOL);
+
+      // 40% chance of rainbow, 60% solid color
+      const useRainbow = !color && Math.random() < 0.4;
       const c = color || pick(COLORS);
+
       el.textContent = km;
-      el.style.color = c;
-      el.style.textShadow = `0 0 80px ${c}, 0 0 160px ${c}`;
+
+      if (useRainbow) {
+        el.classList.add('rainbow');
+        el.style.textShadow = '0 0 80px rgba(255,150,200,0.6), 0 0 160px rgba(129,140,248,0.4)';
+      } else {
+        el.style.color = c;
+        el.style.textShadow = `0 0 80px ${c}, 0 0 160px ${c}`;
+      }
 
       // Random appear animation
       const appearClass = pick(APPEARS);
-      el.className = appearClass;
+      el.className = appearClass + (useRainbow ? ' rainbow' : '');
 
       // After appear, switch to idle animation
       const idleClass = pick(IDLES);
       setTimeout(() => {
-        el.className = idleClass;
+        el.className = idleClass + (useRainbow ? ' rainbow' : '');
       }, 600);
 
       // Schedule exit animation
       const exitClass = pick(EXITS);
       setTimeout(() => {
-        el.className = exitClass;
+        el.className = exitClass + (useRainbow ? ' rainbow' : '');
       }, 2400);
 
       // Spawn particles
@@ -265,7 +290,7 @@
           p.style.setProperty('--ty', Math.sin(angle) * dist + 'px');
           p.style.left = '50%';
           p.style.top = '50%';
-          p.style.color = c;
+          p.style.color = useRainbow ? pick(COLORS) : c;
           p.style.animationDelay = (Math.random() * 0.3) + 's';
           p.style.fontSize = (20 + Math.random() * 30) + 'px';
           document.body.appendChild(p);

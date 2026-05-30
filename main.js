@@ -449,49 +449,8 @@ ipcMain.on('close-app', () => {
   app.quit();
 });
 
-// === Prank: Giant kaomoji overlay ===
-ipcMain.on('prank-giant', (event, { kaomoji, duration }) => {
-  const now = Date.now();
-  // Cooldown: at least 20 minutes between pranks
-  if (now - lastPrankTime < 20 * 60 * 1000) return;
-  lastPrankTime = now;
-
-  const { width, height } = screen.getPrimaryDisplay().workAreaSize;
-
-  const prankWin = new BrowserWindow({
-    width,
-    height,
-    x: 0,
-    y: 0,
-    transparent: true,
-    frame: false,
-    alwaysOnTop: true,
-    resizable: false,
-    focusable: false,
-    skipTaskbar: true,
-    hasShadow: false,
-    backgroundColor: '#00000000',
-    webPreferences: {
-      nodeIntegration: true,
-      contextIsolation: false
-    }
-  });
-
-  prankWin.setIgnoreMouseEvents(true);
-  prankWin.loadFile(path.join(__dirname, 'renderer', 'prank-giant.html'));
-
-  prankWin.webContents.on('did-finish-load', () => {
-    prankWin.webContents.send('show-giant', { kaomoji: kaomoji || '(=^・ω・^=)' });
-  });
-
-  const d = duration || 3000;
-  setTimeout(() => {
-    if (!prankWin.isDestroyed()) prankWin.close();
-  }, d);
-});
-
-// === Easter Egg: Giant kaomoji (no cooldown) ===
-ipcMain.on('easter-egg-giant', (event, { kaomoji, color, duration }) => {
+// === Giant kaomoji overlay (merged prank + easter egg) ===
+function showGiantKaomoji(kaomoji, color, duration) {
   const { width, height } = screen.getPrimaryDisplay().workAreaSize;
 
   const prankWin = new BrowserWindow({
@@ -518,8 +477,8 @@ ipcMain.on('easter-egg-giant', (event, { kaomoji, color, duration }) => {
 
   prankWin.webContents.on('did-finish-load', () => {
     prankWin.webContents.send('show-giant', {
-      kaomoji: kaomoji || '(=^・ω・^=)',
-      color: color || '#f9a8d4'
+      kaomoji: kaomoji || null,
+      color: color || null
     });
   });
 
@@ -527,6 +486,19 @@ ipcMain.on('easter-egg-giant', (event, { kaomoji, color, duration }) => {
   setTimeout(() => {
     if (!prankWin.isDestroyed()) prankWin.close();
   }, d);
+}
+
+// Auto-triggered by easter egg system (with cooldown)
+ipcMain.on('prank-giant', (event, { kaomoji, duration }) => {
+  const now = Date.now();
+  if (now - lastPrankTime < 20 * 60 * 1000) return;
+  lastPrankTime = now;
+  showGiantKaomoji(kaomoji, null, duration || 4000);
+});
+
+// Triggered by user interaction (no cooldown)
+ipcMain.on('easter-egg-giant', (event, { kaomoji, color, duration }) => {
+  showGiantKaomoji(kaomoji, color, duration || 3500);
 });
 
 // === Care Rain: floating encouragement overlay ===
