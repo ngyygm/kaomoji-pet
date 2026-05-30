@@ -450,7 +450,7 @@ ipcMain.on('close-app', () => {
 });
 
 // === Giant kaomoji overlay (merged prank + easter egg) ===
-function showGiantKaomoji(kaomoji, color, duration) {
+function showGiantKaomoji(kaomoji, color, duration, mode) {
   const { width, height } = screen.getPrimaryDisplay().workAreaSize;
 
   const prankWin = new BrowserWindow({
@@ -478,7 +478,8 @@ function showGiantKaomoji(kaomoji, color, duration) {
   prankWin.webContents.on('did-finish-load', () => {
     prankWin.webContents.send('show-giant', {
       kaomoji: kaomoji || null,
-      color: color || null
+      color: color || null,
+      mode: mode || null
     });
   });
 
@@ -497,8 +498,8 @@ ipcMain.on('prank-giant', (event, { kaomoji, duration }) => {
 });
 
 // Triggered by user interaction (no cooldown)
-ipcMain.on('easter-egg-giant', (event, { kaomoji, color, duration }) => {
-  showGiantKaomoji(kaomoji, color, duration || 3500);
+ipcMain.on('easter-egg-giant', (event, { kaomoji, color, duration, mode }) => {
+  showGiantKaomoji(kaomoji, color, duration || 3500, mode);
 });
 
 // === Care Rain: floating encouragement overlay ===

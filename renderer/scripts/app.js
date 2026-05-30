@@ -139,6 +139,30 @@ class App {
     window.petAPI.onAppClosing(() => {
       this.saveManager.saveFull(this.petState, this.hiddenState.getState());
     });
+
+    // Secret keyboard triggers
+    const TRIGGERS = {
+      'tantiao': () => window.petAPI.triggerBilliard(9000),
+      'caiyu': () => window.petAPI.triggerCareRain(
+        typeof CARE_MESSAGES !== 'undefined' ? CARE_MESSAGES : ['休息一下。', '我在陪着你。'],
+        10000, 0.75
+      ),
+    };
+    let keyBuffer = '';
+    const maxLen = Math.max(...Object.keys(TRIGGERS).map(k => k.length));
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key.length !== 1) return;
+      keyBuffer += e.key.toLowerCase();
+      if (keyBuffer.length > maxLen) keyBuffer = keyBuffer.slice(-maxLen);
+      for (const [seq, fn] of Object.entries(TRIGGERS)) {
+        if (keyBuffer.endsWith(seq)) {
+          keyBuffer = '';
+          fn();
+          break;
+        }
+      }
+    });
   }
 
   setupGlobalMouse() {

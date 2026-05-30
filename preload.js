@@ -19,6 +19,7 @@ contextBridge.exposeInMainWorld('petAPI', {
   onWalkDone: (callback) => ipcRenderer.on('walk-done', () => callback()),
   prankGiant: (kaomoji, duration) => ipcRenderer.send('prank-giant', { kaomoji, duration }),
   easterEggGiant: (kaomoji, color, duration) => ipcRenderer.send('easter-egg-giant', { kaomoji, color, duration }),
+  triggerBilliard: (duration) => ipcRenderer.send('easter-egg-giant', { kaomoji: null, color: null, duration, mode: 'billiard' }),
   triggerCareRain: (messages, duration, opacity) => ipcRenderer.send('care-rain', { messages, duration, opacity }),
   showRenameDialog: (currentName) => ipcRenderer.invoke('show-rename-dialog', currentName)
 });
