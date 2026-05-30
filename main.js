@@ -581,6 +581,28 @@ app.whenReady().then(() => {
   startSystemMonitor();
 });
 
+// Crash recovery: recreate window if renderer crashes
+app.on('render-process-gone', (_, webContents, details) => {
+  console.error('Renderer crashed:', details.reason);
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.reload();
+  } else {
+    createMainWindow();
+  }
+});
+
+// Handle system suspend/resume
+try {
+  powerMonitor.on('resume', () => {
+    if (!mainWindow || mainWindow.isDestroyed()) {
+      createMainWindow();
+    }
+    // Restart system monitor if it died
+    if (!systemMonitorTimer) startSystemMonitor();
+    if (!mouseTracker) startMouseTracker();
+  });
+} catch (_) {}
+
 app.on('window-all-closed', () => {
   stopMouseTracker();
   stopSystemMonitor();
