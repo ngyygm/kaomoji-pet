@@ -11,14 +11,44 @@ class BehaviorEngine {
     this._tickInterval = null;
     this._wasUserIdle = false;
     this._prevHour = new Date().getHours();
+    this._fxTimer = null;
   }
 
   start() {
     this._tickInterval = setInterval(() => this._tick(), 8000);
+    this._scheduleNextFx();
   }
 
   stop() {
     if (this._tickInterval) { clearInterval(this._tickInterval); this._tickInterval = null; }
+    if (this._fxTimer) { clearTimeout(this._fxTimer); this._fxTimer = null; }
+  }
+
+  _scheduleNextFx() {
+    if (this._fxTimer) clearTimeout(this._fxTimer);
+    const delay = (40 + Math.random() * 20) * 60 * 1000; // 40~60 min
+    this._fxTimer = setTimeout(() => {
+      this._triggerRandomFx();
+      this._scheduleNextFx();
+    }, delay);
+  }
+
+  _triggerRandomFx() {
+    const effects = ['billiard', 'giant', 'giant', 'rain'];
+    const pick = effects[Math.floor(Math.random() * effects.length)];
+    if (pick === 'billiard') {
+      window.petAPI.triggerBilliard(9000);
+      this.renderer.setAnimationOverride('surprised', 3000);
+    } else if (pick === 'giant') {
+      window.petAPI.easterEggGiant(null, null, 4000);
+      this.renderer.setAnimationOverride('surprised', 3000);
+    } else if (pick === 'rain') {
+      window.petAPI.triggerCareRain(
+        typeof CARE_MESSAGES !== 'undefined' ? CARE_MESSAGES : ['休息一下。', '我在陪着你。'],
+        10000, 0.75
+      );
+      this.renderer.spawnParticles('heart', 5);
+    }
   }
 
   _tick() {
