@@ -8,7 +8,7 @@ contextBridge.exposeInMainWorld('petAPI', {
   getScreenSize: () => ipcRenderer.invoke('get-screen-size'),
   getWindowPosition: () => ipcRenderer.invoke('get-window-position'),
   getWindowSize: () => ipcRenderer.invoke('get-window-size'),
-  resizeWindow: (width, height, expandUp) => ipcRenderer.send('resize-window', { width, height, expandUp }),
+  resizeWindow: (width, height) => ipcRenderer.send('resize-window', { width, height }),
   setIgnoreMouseEvents: (ignore, options) => ipcRenderer.send('set-ignore-mouse', { ignore, options }),
   saveData: (data) => ipcRenderer.send('save-data', data),
   loadData: () => ipcRenderer.invoke('load-data'),

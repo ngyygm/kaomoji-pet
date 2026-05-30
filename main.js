@@ -316,19 +316,8 @@ ipcMain.handle('get-window-size', () => {
   return null;
 });
 
-ipcMain.on('resize-window', (event, { width, height, expandUp }) => {
-  if (mainWindow && !mainWindow.isDestroyed()) {
-    if (expandUp) {
-      // Expand upward: keep bottom edge fixed, grow window upward
-      const [oldW, oldH] = mainWindow.getSize();
-      const [x, y] = mainWindow.getPosition();
-      const newH = Math.round(height);
-      const dy = newH - oldH;
-      mainWindow.setBounds({ x, y: y - dy, width: Math.round(width), height: newH });
-    } else {
-      mainWindow.setSize(Math.round(width), Math.round(height));
-    }
-  }
+ipcMain.on('resize-window', (event, { width, height }) => {
+  // Window size is fixed; this handler is kept for compatibility
 });
 
 ipcMain.on('set-ignore-mouse', (event, { ignore, options }) => {

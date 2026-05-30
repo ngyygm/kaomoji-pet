@@ -128,12 +128,7 @@ class PetRenderer {
   // === Window Auto-Resize ===
 
   measureAndResize() {
-    if (this._resizeDebounce) clearTimeout(this._resizeDebounce);
-    this._resizeDebounce = setTimeout(() => {
-      requestAnimationFrame(() => {
-        this._doResize();
-      });
-    }, 150);
+    // Window size is fixed; no dynamic resizing needed
   }
 
   _doResize() {
