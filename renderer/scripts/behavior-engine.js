@@ -24,26 +24,53 @@ class BehaviorEngine {
     if (this._fxTimer) { clearTimeout(this._fxTimer); this._fxTimer = null; }
   }
 
-  _scheduleNextFx() {
+  _scheduleNextFx(delayOverride = null) {
     if (this._fxTimer) clearTimeout(this._fxTimer);
-    const delay = (40 + Math.random() * 20) * 60 * 1000; // 40~60 min
-    this._fxTimer = setTimeout(() => {
-      this._triggerRandomFx();
+    const minDelay = CONFIG.RANDOM_BIG_EFFECT_MIN_INTERVAL || 30 * 60 * 1000;
+    const maxDelay = CONFIG.RANDOM_BIG_EFFECT_MAX_INTERVAL || 45 * 60 * 1000;
+    const delay = delayOverride ?? (minDelay + Math.random() * Math.max(0, maxDelay - minDelay));
+    console.log(`[random-fx] next in ${(delay / 60000).toFixed(1)} min`);
+    this._fxTimer = setTimeout(async () => {
+      const triggered = await this._triggerRandomFx();
+      if (!triggered) {
+        console.warn('[random-fx] no effect triggered; retrying in 1 min');
+        this._scheduleNextFx(60 * 1000);
+        return;
+      }
       this._scheduleNextFx();
     }, delay);
   }
 
-  _triggerRandomFx() {
-    // Auto-discover all effects from registry
-    if (typeof BIG_EFFECTS === 'undefined' || !BIG_EFFECTS.length) return;
-    const effect = BIG_EFFECTS[Math.floor(Math.random() * BIG_EFFECTS.length)];
-    window.petAPI.runBigEffect(effect.id);
+  async _triggerRandomFx() {
+    let effects = Array.isArray(window.BIG_EFFECTS) ? window.BIG_EFFECTS : [];
+    if (!effects.length && typeof BIG_EFFECTS !== 'undefined' && Array.isArray(BIG_EFFECTS)) {
+      effects = BIG_EFFECTS;
+    }
+    if (!effects.length && window.petAPI?.listBigEffects) {
+      try {
+        effects = await window.petAPI.listBigEffects();
+        window.BIG_EFFECTS = effects;
+        if (typeof BIG_EFFECTS !== 'undefined') BIG_EFFECTS = effects;
+      } catch (err) {
+        console.warn('[random-fx] failed to refresh effect list', err);
+      }
+    }
+    if (!effects.length) return false;
+
+    const effect = effects[Math.floor(Math.random() * effects.length)];
+    const result = await window.petAPI.runBigEffect(effect.id);
+    if (result && result.success === false) {
+      console.warn('[random-fx] failed to run effect', effect.id, result.error);
+      return false;
+    }
+    console.log(`[random-fx] triggered ${effect.id}`);
     if (effect.petAnimation) {
       this.renderer.setAnimationOverride(effect.petAnimation, effect.petAnimDuration || 3000);
     }
     if (effect.petParticles) {
       this.renderer.spawnParticles(effect.petParticles[0], effect.petParticles[1]);
     }
+    return true;
   }
 
   _tick() {
