@@ -7,6 +7,13 @@
   "description": "颜文字和星光被中心黑洞旋转吸入再喷出。",
   "entry": "index.html",
   "duration": 12000,
+  "performance": {
+    "renderer": "canvas",
+    "adaptiveQuality": true,
+    "maxParticles": 150,
+    "targetFps": 60,
+    "minQuality": 0.62
+  },
   "window": {
     "type": "fullscreen-transparent",
     "clickThrough": true,

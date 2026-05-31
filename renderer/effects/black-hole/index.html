@@ -7,16 +7,18 @@
 </head>
 <body>
   <canvas id="fx"></canvas>
+  <script src="../_shared/effect-runtime.js"></script>
   <script>
     const { ipcRenderer } = require('electron');
     ipcRenderer.on('effect:start', (event, payload) => start(payload?.duration || 12000));
     function start(duration) {
-      const canvas = document.getElementById('fx'), ctx = canvas.getContext('2d');
-      const W = canvas.width = window.innerWidth, H = canvas.height = window.innerHeight;
+      const runtime = EffectRuntime.createRuntime({ id: 'black-hole', adaptiveQuality: true, minQuality: 0.62, targetFps: 60 });
+      const canvas = document.getElementById('fx'), { ctx } = EffectRuntime.createHiDpiCanvas(canvas);
+      const W = window.innerWidth, H = window.innerHeight;
       const cx = W / 2, cy = H / 2;
       const faces = ['(=^・ω・^=)', '(；ﾟДﾟ)', '(>ω<)', '(ꈍᴗꈍ)', '(✧◡✧)', 'Σ(っ°Д°;)っ'];
       const colors = ['#f9a8d4', '#93c5fd', '#fde68a', '#86efac', '#c084fc'];
-      const particles = Array.from({ length: 150 }, () => spawn(true));
+      const particles = Array.from({ length: runtime.scaleCount(150, 96) }, () => spawn(true));
       let startTime = performance.now();
       function pick(a){ return a[Math.floor(Math.random()*a.length)]; }
       function spawn(anywhere=false) {
@@ -56,9 +58,9 @@
           ctx.font = '46px "Segoe UI Emoji", sans-serif';
           ctx.fillStyle = '#fff'; ctx.fillText('(ﾉ≧∀≦)ﾉ', cx - 95, cy + 14);
         }
-        if (elapsed < duration) requestAnimationFrame(loop); else window.close();
+        if (elapsed >= duration) { runtime.stop(); window.close(); }
       }
-      requestAnimationFrame(loop);
+      runtime.requestEffectFrame(loop);
     }
   </script>
 </body>

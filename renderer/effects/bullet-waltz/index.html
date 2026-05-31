@@ -4,435 +4,260 @@
   <meta charset="UTF-8">
   <title> </title>
   <style>
-    * { margin: 0; padding: 0; user-select: none; }
-    html, body {
-      width: 100%;
-      height: 100%;
-      overflow: hidden;
-      background: transparent;
-    }
+    * { margin: 0; padding: 0; user-select: none; box-sizing: border-box; }
+    html, body { width: 100%; height: 100%; overflow: hidden; background: transparent; }
+    canvas { display: block; width: 100%; height: 100%; }
     #center-char {
       position: absolute;
-      font-size: 48px;
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -50%);
       color: white;
-      text-shadow: 0 0 30px rgba(255,255,255,0.8);
       pointer-events: none;
       animation: rotateCenter 8s linear infinite, pulseCenter 2s ease-in-out infinite;
+      transition: opacity 600ms ease-out, color 200ms ease, text-shadow 200ms ease;
       z-index: 10;
-      transition: opacity 600ms ease-out;
     }
     @keyframes rotateCenter {
       from { transform: translate(-50%, -50%) rotate(0deg); }
       to { transform: translate(-50%, -50%) rotate(360deg); }
     }
     @keyframes pulseCenter {
-      0%, 100% { transform: translate(-50%, -50%) scale(1.0); }
-      50% { transform: translate(-50%, -50%) scale(1.1); }
-    }
-    .bullet {
-      position: absolute;
-      pointer-events: none;
-      will-change: transform, opacity;
-      transition: none;
-    }
-    .bullet-ghost {
-      position: absolute;
-      pointer-events: none;
-      will-change: opacity;
-    }
-    #fade-overlay {
-      position: fixed;
-      top: 0; left: 0; right: 0; bottom: 0;
-      opacity: 0;
-      pointer-events: none;
-      z-index: 100;
+      0%, 100% { scale: 1; }
+      50% { scale: 1.1; }
     }
   </style>
 </head>
 <body>
+  <canvas id="fx"></canvas>
   <div id="center-char">(=^・ω・^=)</div>
-  <div id="fade-overlay"></div>
+  <script src="../_shared/effect-runtime.js"></script>
   <script>
     const { ipcRenderer } = require('electron');
 
-    ipcRenderer.on('show-bullet-waltz', (event, { duration }) => {
+    ipcRenderer.on('show-bullet-waltz', (event, { duration } = {}) => {
+      const runtime = EffectRuntime.createRuntime({
+        id: 'bullet-waltz',
+        adaptiveQuality: true,
+        minQuality: 0.48,
+        targetFps: 60
+      });
+      const { ctx } = EffectRuntime.createHiDpiCanvas(document.getElementById('fx'));
       const EFFECT_DURATION = duration || 16000;
-      const FADE_DURATION = 600;
-      const FPS_INTERVAL = 1000 / 60;
-
-      const screenW = window.innerWidth;
-      const screenH = window.innerHeight;
-      const cx = screenW / 2;
-      const cy = screenH / 2;
+      const screenW = () => window.innerWidth;
+      const screenH = () => window.innerHeight;
+      const cx = () => screenW() / 2;
+      const cy = () => screenH() / 2;
 
       const centerEl = document.getElementById('center-char');
-      centerEl.style.left = cx + 'px';
-      centerEl.style.top = cy + 'px';
       const CENTER_KAOMOJI = [
         '(=^・ω・^=)', '(✧◡✧)', '(ﾉ´▽｀)ﾉ♪', '٩(๑❛ᴗ❛๑)۶',
         '(๑>◡<๑)', '(・ω<)☆', '(｡♥ᴗ♥｡)', '(ง •̀_•́)ง',
         '(ﾉ≧∀≦)ﾉ', '＼(＾▽＾)／', '(｡◕‿◕｡)', '(★^O^★)'
       ];
-      const CENTER_COLORS = [
-        '#ffffff', '#fde68a', '#f9a8d4', '#93c5fd',
-        '#86efac', '#c084fc', '#67e8f9', '#fb923c'
-      ];
-
-      // ---- Bullet system ----
-      let bullets = [];
-      let ghosts = [];
-      let frameCount = 0;
-      let running = true;
-
-      // Pattern state
-      const PATTERN_PHASES = ['SPIRAL', 'HEART', 'PETALS', 'FAN', 'COMET', 'LATTICE'];
-      let currentPhaseIndex = 0;
-      let phaseStartTime = 0;
-      const PHASE_DURATION = 2200;
-
-      // Spiral state
-      let spiralAngle = 0;
-
-      // Heart state
-      let heartRotation = 0;
-
-      // Petals state
-      let petalRotation = 0;
-      let petalHueShift = 0;
-      let petalSpawnTimer = 0;
-
-      // Fan state
-      let fanAngle = 0;
-      let fanSpawnTimer = 0;
-      let cometTimer = 0;
-      let latticeTimer = 0;
-
-      // Color palettes
+      const CENTER_COLORS = ['#ffffff', '#fde68a', '#f9a8d4', '#93c5fd', '#86efac', '#c084fc', '#67e8f9', '#fb923c'];
       const PALETTES = {
         SPIRAL: ['#67e8f9', '#93c5fd', '#a78bfa', '#22d3ee'],
-        HEART:  ['#f9a8d4', '#f472b6', '#f87171', '#fb7185'],
+        HEART: ['#f9a8d4', '#f472b6', '#f87171', '#fb7185'],
         PETALS: ['#c084fc', '#e879f9', '#f0abfc', '#818cf8'],
-        FAN:    ['#fde68a', '#fbbf24', '#86efac', '#34d399'],
-        COMET:  ['#fef3c7', '#fca5a5', '#fdba74', '#f9a8d4'],
-        LATTICE:['#a7f3d0', '#67e8f9', '#bfdbfe', '#ddd6fe']
+        FAN: ['#fde68a', '#fbbf24', '#86efac', '#34d399'],
+        COMET: ['#fef3c7', '#fca5a5', '#fdba74', '#f9a8d4'],
+        LATTICE: ['#a7f3d0', '#67e8f9', '#bfdbfe', '#ddd6fe']
       };
+      const PHASES = ['SPIRAL', 'HEART', 'PETALS', 'FAN', 'COMET', 'LATTICE'];
+      const PHASE_DURATION = 2200;
 
-      function randomFrom(arr) {
-        return arr[Math.floor(Math.random() * arr.length)];
-      }
+      let bullets = [];
+      let ghosts = [];
+      let frame = 0;
+      let phaseIndex = 0;
+      let phaseStart = 0;
+      let spiralAngle = 0;
+      let heartRotation = 0;
+      let petalRotation = 0;
+      let petalTimer = 0;
+      let fanAngle = 0;
+      let fanTimer = 0;
+      let cometTimer = 0;
+      let latticeTimer = 0;
+      let startedAt = performance.now();
+      let closing = false;
+
+      function pick(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
 
       function updateCenterCharacter(forceBig = false) {
-        const color = randomFrom(CENTER_COLORS);
-        centerEl.textContent = randomFrom(CENTER_KAOMOJI);
+        const color = pick(CENTER_COLORS);
+        centerEl.textContent = pick(CENTER_KAOMOJI);
         centerEl.style.color = color;
         centerEl.style.fontSize = (forceBig ? 54 + Math.random() * 18 : 42 + Math.random() * 18) + 'px';
         centerEl.style.textShadow = `0 0 18px ${color}, 0 0 42px ${color}`;
         centerEl.style.filter = `hue-rotate(${Math.floor(Math.random() * 360)}deg)`;
       }
 
-      function createBulletEl(symbol, color, size) {
-        const el = document.createElement('div');
-        el.className = 'bullet';
-        el.textContent = symbol;
-        el.style.fontSize = size + 'px';
-        el.style.color = color;
-        el.style.textShadow = '0 0 16px ' + color;
-        document.body.appendChild(el);
-        return el;
-      }
-
       function spawnBullet(x, y, vx, vy, symbol, color, size, maxLife) {
-        const el = createBulletEl(symbol, color, size);
-        const bullet = {
-          x: x,
-          y: y,
-          vx: vx,
-          vy: vy,
-          symbol: symbol,
-          color: color,
-          size: size,
-          life: 0,
-          maxLife: maxLife || (180 + Math.floor(Math.random() * 60)),
-          el: el
-        };
-        bullets.push(bullet);
+        bullets.push({ x, y, vx, vy, symbol, color, size, life: 0, maxLife: maxLife || 220 });
       }
 
-      function spawnGhost(bullet) {
-        const el = document.createElement('div');
-        el.className = 'bullet-ghost';
-        el.textContent = bullet.symbol;
-        el.style.fontSize = (bullet.size * 1.0) + 'px';
-        el.style.color = bullet.color;
-        el.style.textShadow = '0 0 10px ' + bullet.color;
-        el.style.opacity = '0.5';
-        el.style.left = bullet.x + 'px';
-        el.style.top = bullet.y + 'px';
-        el.style.transform = 'translate(-50%, -50%)';
-        document.body.appendChild(el);
-        ghosts.push({ el: el, life: 0, maxLife: 20 });
+      function spawnGhost(b) {
+        ghosts.push({ x: b.x, y: b.y, symbol: b.symbol, color: b.color, size: b.size, life: 0, maxLife: 20 });
       }
 
-      // ---- Pattern: SPIRAL ----
-      function updateSpiral(dt) {
-        // Dense triple spiral.
-        if (frameCount % 3 === 0) {
-          const palette = PALETTES.SPIRAL;
-          for (let arm = 0; arm < 6; arm++) {
-            const angle = spiralAngle + (arm * Math.PI / 3);
-            const speed = 3.4 + arm * 0.18;
-            const vx = Math.cos(angle) * speed;
-            const vy = Math.sin(angle) * speed;
-            const symbol = ['✧', '✦', '✺'][arm % 3];
-            spawnBullet(cx, cy, vx, vy, symbol, randomFrom(palette), 42 + arm * 2, 230);
-          }
-          spiralAngle += (18 * Math.PI) / 180;
+      function updateSpiral() {
+        if (frame % 3 !== 0) return;
+        for (let arm = 0; arm < runtime.scaleCount(6, 4); arm++) {
+          const angle = spiralAngle + (arm * Math.PI / 3);
+          const speed = 3.4 + arm * 0.18;
+          spawnBullet(cx(), cy(), Math.cos(angle) * speed, Math.sin(angle) * speed, ['✧', '✦', '✺'][arm % 3], pick(PALETTES.SPIRAL), 42 + arm * 2, 230);
         }
+        spiralAngle += (18 * Math.PI) / 180;
       }
 
-      // ---- Pattern: HEART ----
-      function updateHeart(dt) {
-        if (frameCount % 55 === 0) {
-          const palette = PALETTES.HEART;
-          const scale = 12;
-          for (let i = 0; i < 48; i++) {
-            const t = (i / 48) * 2 * Math.PI;
-            // Parametric heart curve
-            const hx = 16 * Math.pow(Math.sin(t), 3);
-            const hy = -(13 * Math.cos(t) - 5 * Math.cos(2 * t) - 2 * Math.cos(3 * t) - Math.cos(4 * t));
-            // Apply rotation offset
-            const cos_r = Math.cos(heartRotation);
-            const sin_r = Math.sin(heartRotation);
-            const rx = hx * cos_r - hy * sin_r;
-            const ry = hx * sin_r + hy * cos_r;
-            // Direction from center
-            const dist = Math.sqrt(rx * rx + ry * ry);
-            const speed = 2.6;
-            const vx = dist > 0 ? (rx / dist) * speed : 0;
-            const vy = dist > 0 ? (ry / dist) * speed : 0;
-            spawnBullet(cx, cy, vx, vy, i % 3 === 0 ? '♥' : '♡', randomFrom(palette), 38 + (i % 4) * 3, 220);
-          }
-          heartRotation += 0.45;
+      function updateHeart() {
+        if (frame % 55 !== 0) return;
+        const count = runtime.scaleCount(48, 30);
+        for (let i = 0; i < count; i++) {
+          const t = (i / count) * 2 * Math.PI;
+          const hx = 16 * Math.pow(Math.sin(t), 3);
+          const hy = -(13 * Math.cos(t) - 5 * Math.cos(2 * t) - 2 * Math.cos(3 * t) - Math.cos(4 * t));
+          const rx = hx * Math.cos(heartRotation) - hy * Math.sin(heartRotation);
+          const ry = hx * Math.sin(heartRotation) + hy * Math.cos(heartRotation);
+          const dist = Math.max(1, Math.hypot(rx, ry));
+          spawnBullet(cx(), cy(), rx / dist * 2.6, ry / dist * 2.6, i % 3 === 0 ? '♥' : '♡', pick(PALETTES.HEART), 38 + (i % 4) * 3, 220);
         }
+        heartRotation += 0.45;
       }
 
-      // ---- Pattern: PETALS ----
-      function updatePetals(dt) {
-        petalSpawnTimer++;
-        if (petalSpawnTimer >= 70) {
-          petalSpawnTimer = 0;
-          const palette = PALETTES.PETALS;
-          for (let i = 0; i < 84; i++) {
-            const theta = (i / 84) * 2 * Math.PI;
-            const r = Math.cos(7 * theta);
-            if (r <= 0) continue;
-            const px = r * Math.cos(theta);
-            const py = r * Math.sin(theta);
-            // Rotate the whole pattern
-            const cos_r = Math.cos(petalRotation);
-            const sin_r = Math.sin(petalRotation);
-            const rx = px * cos_r - py * sin_r;
-            const ry = px * sin_r + py * cos_r;
-            const dist = Math.sqrt(rx * rx + ry * ry);
-            const speed = 2.2;
-            const vx = dist > 0 ? (rx / dist) * speed : 0;
-            const vy = dist > 0 ? (ry / dist) * speed : 0;
-            const symbol = ['✿', '❁', '✾', '✧'][i % 4];
-            spawnBullet(cx, cy, vx, vy, symbol, randomFrom(palette), 32 + (i % 5) * 3, 240);
-          }
-          petalRotation += 7 * (Math.PI / 180);
-          petalHueShift += 30;
+      function updatePetals() {
+        petalTimer++;
+        if (petalTimer < 70) return;
+        petalTimer = 0;
+        const count = runtime.scaleCount(84, 52);
+        for (let i = 0; i < count; i++) {
+          const theta = (i / count) * 2 * Math.PI;
+          const r = Math.cos(7 * theta);
+          if (r <= 0) continue;
+          const px = r * Math.cos(theta);
+          const py = r * Math.sin(theta);
+          const rx = px * Math.cos(petalRotation) - py * Math.sin(petalRotation);
+          const ry = px * Math.sin(petalRotation) + py * Math.cos(petalRotation);
+          const dist = Math.max(1, Math.hypot(rx, ry));
+          spawnBullet(cx(), cy(), rx / dist * 2.2, ry / dist * 2.2, ['✿', '❁', '✾', '✧'][i % 4], pick(PALETTES.PETALS), 32 + (i % 5) * 3, 240);
         }
+        petalRotation += 7 * (Math.PI / 180);
       }
 
-      // ---- Pattern: FAN ----
-      function updateFan(dt) {
-        fanSpawnTimer++;
-        if (fanSpawnTimer % 2 === 0) {
-          const palette = PALETTES.FAN;
-          const totalStreams = 14;
+      function updateFan() {
+        fanTimer++;
+        if (fanTimer % 2 === 0) {
+          const totalStreams = runtime.scaleCount(14, 9);
           const fanSpread = 170 * (Math.PI / 180);
           const startAngle = fanAngle - fanSpread / 2;
-
           for (let i = 0; i < totalStreams; i++) {
-            const streamAngle = startAngle + (i / (totalStreams - 1)) * fanSpread;
+            const angle = startAngle + (i / Math.max(1, totalStreams - 1)) * fanSpread;
             const speed = 3.7 + (i % 3) * 0.35;
-            const vx = Math.cos(streamAngle) * speed;
-            const vy = Math.sin(streamAngle) * speed;
-            const symbol = ['♪', '♫', '★', '✦'][i % 4];
-            spawnBullet(cx, cy, vx, vy, symbol, randomFrom(palette), 36 + (i % 4) * 3, 190);
+            spawnBullet(cx(), cy(), Math.cos(angle) * speed, Math.sin(angle) * speed, ['♪', '♫', '★', '✦'][i % 4], pick(PALETTES.FAN), 36 + (i % 4) * 3, 190);
           }
         }
         fanAngle += 1.7 * (Math.PI / 180);
       }
 
-      function updateComet(dt) {
+      function updateComet() {
         cometTimer++;
         if (cometTimer % 3 !== 0) return;
-        const palette = PALETTES.COMET;
+        const lanes = runtime.scaleCount(10, 6);
         const base = (cometTimer * 0.08) % (Math.PI * 2);
-        for (let lane = 0; lane < 10; lane++) {
-          const angle = base + lane * Math.PI * 2 / 10;
+        for (let lane = 0; lane < lanes; lane++) {
+          const angle = base + lane * Math.PI * 2 / lanes;
           const offset = 120 + Math.sin(cometTimer * 0.04 + lane) * 70;
-          const sx = cx + Math.cos(angle) * offset;
-          const sy = cy + Math.sin(angle) * offset;
-          const tx = cx - sx;
-          const ty = cy - sy;
-          const dist = Math.max(1, Math.sqrt(tx * tx + ty * ty));
+          const sx = cx() + Math.cos(angle) * offset;
+          const sy = cy() + Math.sin(angle) * offset;
+          const dist = Math.max(1, Math.hypot(cx() - sx, cy() - sy));
           const speed = 4.6 + lane * 0.12;
-          spawnBullet(sx, sy, tx / dist * speed, ty / dist * speed, lane % 2 ? '✹' : '✶', randomFrom(palette), 34, 160);
+          spawnBullet(sx, sy, (cx() - sx) / dist * speed, (cy() - sy) / dist * speed, lane % 2 ? '✹' : '✶', pick(PALETTES.COMET), 34, 160);
         }
       }
 
-      function updateLattice(dt) {
+      function updateLattice() {
         latticeTimer++;
         if (latticeTimer % 9 !== 0) return;
-        const palette = PALETTES.LATTICE;
         const rows = 5;
-        const cols = 9;
+        const cols = runtime.scaleCount(9, 6);
         for (let r = 0; r < rows; r++) {
           for (let c = 0; c < cols; c++) {
-            const x = (screenW / (cols + 1)) * (c + 1);
-            const y = (screenH / (rows + 1)) * (r + 1);
-            const angle = Math.atan2(y - cy, x - cx) + Math.sin(frameCount * 0.05) * 0.5;
+            const x = (screenW() / (cols + 1)) * (c + 1);
+            const y = (screenH() / (rows + 1)) * (r + 1);
+            const angle = Math.atan2(y - cy(), x - cx()) + Math.sin(frame * 0.05) * 0.5;
             const speed = 2.4 + ((r + c) % 4) * 0.28;
-            spawnBullet(x, y, Math.cos(angle) * speed, Math.sin(angle) * speed, '◇', randomFrom(palette), 30, 150);
+            spawnBullet(x, y, Math.cos(angle) * speed, Math.sin(angle) * speed, '◇', pick(PALETTES.LATTICE), 30, 150);
           }
         }
       }
 
-      // ---- Pattern dispatch ----
-      const PATTERN_UPDATERS = {
-        SPIRAL: updateSpiral,
-        HEART: updateHeart,
-        PETALS: updatePetals,
-        FAN: updateFan,
-        COMET: updateComet,
-        LATTICE: updateLattice
-      };
+      const updaters = { SPIRAL: updateSpiral, HEART: updateHeart, PETALS: updatePetals, FAN: updateFan, COMET: updateComet, LATTICE: updateLattice };
 
-      function getCurrentPhase() {
-        return PATTERN_PHASES[currentPhaseIndex];
+      function drawGlyph(item, opacity) {
+        ctx.globalAlpha = opacity;
+        ctx.font = `${item.size}px "Segoe UI Emoji", "Apple Color Emoji", "Microsoft YaHei", sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillStyle = item.color;
+        ctx.shadowColor = item.color;
+        ctx.shadowBlur = 12 * runtime.state.quality;
+        ctx.fillText(item.symbol, item.x, item.y);
       }
 
-      function advancePhase() {
-        const elapsed = frameCount - phaseStartTime;
-        if (elapsed >= PHASE_DURATION / (1000 / 60)) {
-          currentPhaseIndex = (currentPhaseIndex + 1) % PATTERN_PHASES.length;
-          phaseStartTime = frameCount;
+      function fadeAndClose() {
+        closing = true;
+        runtime.stop();
+        centerEl.style.opacity = '0';
+        document.getElementById('fx').style.transition = 'opacity 600ms ease-out';
+        document.getElementById('fx').style.opacity = '0';
+        setTimeout(() => window.close(), 700);
+      }
+
+      updateCenterCharacter(true);
+      runtime.requestEffectFrame((now) => {
+        if (closing) return;
+        frame++;
+        const elapsed = now - startedAt;
+        if (elapsed >= EFFECT_DURATION) {
+          fadeAndClose();
+          return;
+        }
+
+        if (frame - phaseStart >= PHASE_DURATION / (1000 / 60)) {
+          phaseIndex = (phaseIndex + 1) % PHASES.length;
+          phaseStart = frame;
           updateCenterCharacter(true);
-          // Reset phase-specific state if needed
-          if (getCurrentPhase() === 'FAN') {
-            fanSpawnTimer = 0;
-          }
+          if (PHASES[phaseIndex] === 'FAN') fanTimer = 0;
         }
-      }
+        if (frame % 38 === 0) updateCenterCharacter(false);
 
-      // ---- Main loop ----
-      let lastTime = performance.now();
-      let startTime = lastTime;
+        updaters[PHASES[phaseIndex]]();
 
-      function gameLoop(now) {
-        if (!running) return;
-
-        const elapsed = now - lastTime;
-        if (elapsed < FPS_INTERVAL) {
-          requestAnimationFrame(gameLoop);
-          return;
-        }
-        lastTime = now - (elapsed % FPS_INTERVAL);
-        frameCount++;
-
-        // Check if effect should end
-        const totalElapsed = now - startTime;
-        if (totalElapsed >= EFFECT_DURATION) {
-          fadeOutAndClose();
-          return;
-        }
-
-        // Advance pattern phase
-        advancePhase();
-        if (frameCount % 38 === 0) updateCenterCharacter(false);
-
-        // Update current pattern
-        const phase = getCurrentPhase();
-        PATTERN_UPDATERS[phase](elapsed);
-
-        // Update all bullets
+        ctx.clearRect(0, 0, screenW(), screenH());
         for (let i = bullets.length - 1; i >= 0; i--) {
           const b = bullets[i];
           b.x += b.vx;
           b.y += b.vy;
           b.life++;
-
-          // Trail ghost every 3 frames
-          if (b.life % 3 === 0 && b.life < b.maxLife * 0.7) {
+          if (b.life % Math.round(3 / Math.max(0.6, runtime.state.quality)) === 0 && b.life < b.maxLife * 0.7 && runtime.chance(1)) {
             spawnGhost(b);
           }
-
-          // Calculate opacity: starts at 0.8, fades to 0 over lifetime
-          const progress = b.life / b.maxLife;
-          const opacity = 0.8 * (1 - progress);
-
-          b.el.style.left = b.x + 'px';
-          b.el.style.top = b.y + 'px';
-          b.el.style.transform = 'translate(-50%, -50%)';
-          b.el.style.opacity = opacity;
-
-          // Remove if off-screen or dead
-          if (b.x < -50 || b.x > screenW + 50 || b.y < -50 || b.y > screenH + 50 || b.life >= b.maxLife) {
-            b.el.remove();
+          drawGlyph(b, 0.8 * (1 - b.life / b.maxLife));
+          if (b.x < -80 || b.x > screenW() + 80 || b.y < -80 || b.y > screenH() + 80 || b.life >= b.maxLife) {
             bullets.splice(i, 1);
           }
         }
-
-        // Update ghosts
         for (let i = ghosts.length - 1; i >= 0; i--) {
           const g = ghosts[i];
           g.life++;
-          const ghostOpacity = 0.5 * (1 - g.life / g.maxLife);
-          g.el.style.opacity = ghostOpacity;
-          if (g.life >= g.maxLife) {
-            g.el.remove();
-            ghosts.splice(i, 1);
-          }
+          drawGlyph(g, 0.45 * (1 - g.life / g.maxLife));
+          if (g.life >= g.maxLife) ghosts.splice(i, 1);
         }
-
-        requestAnimationFrame(gameLoop);
-      }
-
-      function fadeOutAndClose() {
-        running = false;
-
-        // Fade out center character
-        centerEl.style.opacity = '0';
-
-        // Fade out all remaining bullets
-        for (const b of bullets) {
-          b.el.style.transition = 'opacity 600ms ease-out';
-          b.el.style.opacity = '0';
-        }
-        for (const g of ghosts) {
-          g.el.style.transition = 'opacity 300ms ease-out';
-          g.el.style.opacity = '0';
-        }
-
-        setTimeout(() => {
-          // Cleanup all elements
-          for (const b of bullets) {
-            if (b.el.parentNode) b.el.remove();
-          }
-          for (const g of ghosts) {
-            if (g.el.parentNode) g.el.remove();
-          }
-          window.close();
-        }, FADE_DURATION + 100);
-      }
-
-      // Start
-      updateCenterCharacter(true);
-      phaseStartTime = 0;
-      requestAnimationFrame(gameLoop);
+        ctx.shadowBlur = 0;
+        ctx.globalAlpha = 1;
+      });
     });
   </script>
 </body>

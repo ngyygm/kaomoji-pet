@@ -8,6 +8,13 @@
   "entry": "index.html",
   "startChannel": "show-parade",
   "duration": 16000,
+  "performance": {
+    "renderer": "hybrid",
+    "adaptiveQuality": true,
+    "maxParticles": 220,
+    "targetFps": 60,
+    "minQuality": 0.55
+  },
   "window": {
     "type": "fullscreen-transparent",
     "clickThrough": true,

@@ -6,6 +6,13 @@
   "description": "复制这个文件夹并修改 effect.json 与 index.html。",
   "entry": "index.html",
   "duration": 5000,
+  "performance": {
+    "renderer": "canvas",
+    "adaptiveQuality": true,
+    "maxParticles": 200,
+    "targetFps": 60,
+    "minQuality": 0.6
+  },
   "window": {
     "type": "fullscreen-transparent",
     "clickThrough": true,

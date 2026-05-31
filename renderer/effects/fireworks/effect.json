@@ -8,6 +8,13 @@
   "entry": "index.html",
   "startChannel": "show-fireworks",
   "duration": 16000,
+  "performance": {
+    "renderer": "canvas",
+    "adaptiveQuality": true,
+    "maxParticles": 1200,
+    "targetFps": 60,
+    "minQuality": 0.46
+  },
   "window": {
     "type": "fullscreen-transparent",
     "clickThrough": true,

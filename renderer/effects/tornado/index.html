@@ -4,44 +4,37 @@
   <meta charset="UTF-8">
   <title> </title>
   <style>
-    * { margin: 0; padding: 0; user-select: none; }
-    html, body {
-      width: 100%;
-      height: 100%;
-      overflow: hidden;
-      background: transparent;
-    }
-    .particle {
+    * { margin: 0; padding: 0; user-select: none; box-sizing: border-box; }
+    html, body { width: 100%; height: 100%; overflow: hidden; background: transparent; }
+    canvas { display: block; width: 100%; height: 100%; }
+    #vortex, #flash {
       position: absolute;
       pointer-events: none;
-      will-change: transform, opacity;
-      font-family: "Segoe UI Emoji", "Apple Color Emoji", sans-serif;
-      white-space: nowrap;
-    }
-    .ghost {
-      position: absolute;
-      pointer-events: none;
-      font-family: "Segoe UI Emoji", "Apple Color Emoji", sans-serif;
-      white-space: nowrap;
+      border-radius: 50%;
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -50%);
     }
     #vortex {
-      position: absolute;
-      pointer-events: none;
+      width: 900px;
+      height: 900px;
+      opacity: 0;
+      background: conic-gradient(from 0deg, rgba(129,140,248,0.3), rgba(249,168,212,0.3), rgba(134,239,172,0.3), rgba(253,230,138,0.3), rgba(192,132,252,0.3), rgba(129,140,248,0.3));
       will-change: transform, opacity;
-      border-radius: 50%;
     }
     #flash {
-      position: absolute;
-      pointer-events: none;
-      border-radius: 50%;
+      width: 1200px;
+      height: 1200px;
       background: white;
       opacity: 0;
     }
   </style>
 </head>
 <body>
+  <canvas id="fx"></canvas>
   <div id="vortex"></div>
   <div id="flash"></div>
+  <script src="../_shared/effect-runtime.js"></script>
   <script>
     const { ipcRenderer } = require('electron');
 
@@ -52,400 +45,200 @@
       '♡', '★', '✧', '♪', '✿', '❁', '☆', '♥',
       '♥', '♫', '✦', '❖', '✺', '⚡', '💫', '◈'
     ];
-
-    const SCATTER_COLORS = [
-      '#f9a8d4', '#818cf8', '#f87171', '#86efac',
-      '#fde68a', '#93c5fd', '#c084fc', '#fb923c'
-    ];
-
-    const EXPLOSION_FRAGMENTS = [
-      '♡', '★', '✧', '♪', '✿', '❁', '☆', '♥',
-      '♫', '✦', '❖', '✺', '⚡', '💫', '◈', '♦',
-      '◉', '◇', '○', '◆', '□', '■', '△', '▽',
-      '(', ')', '=', '^', 'ω', '~', '*', 'o'
-    ];
+    const SCATTER_COLORS = ['#f9a8d4', '#818cf8', '#f87171', '#86efac', '#fde68a', '#93c5fd', '#c084fc', '#fb923c'];
+    const EXPLOSION_FRAGMENTS = ['♡', '★', '✧', '♪', '✿', '❁', '☆', '♥', '♫', '✦', '❖', '✺', '⚡', '💫', '◈', '♦', '◉', '◇', '○', '◆', '□', '■', '△', '▽', '(', ')', '=', '^', 'ω', '~', '*', 'o'];
 
     function pick(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
     function rand(min, max) { return min + Math.random() * (max - min); }
     function lerp(a, b, t) { return a + (b - a) * t; }
 
     ipcRenderer.on('show-tornado', (event, { duration } = {}) => {
+      const runtime = EffectRuntime.createRuntime({ id: 'tornado', adaptiveQuality: true, minQuality: 0.48, targetFps: 60 });
+      const { ctx } = EffectRuntime.createHiDpiCanvas(document.getElementById('fx'));
       const DURATION = duration || 14000;
-      const W = window.innerWidth;
-      const H = window.innerHeight;
-      const CX = W / 2;
-      const CY = H / 2;
-
+      const W = () => window.innerWidth;
+      const H = () => window.innerHeight;
+      const CX = () => W() / 2;
+      const CY = () => H() / 2;
       const PHASE1_END = 0.15;
       const PHASE2_END = 0.75;
-
       const startTime = performance.now();
-      let elements = [];
-      let explosionParticles = [];
-      let ghosts = [];
-      let phase2Started = false;
-      let phase3Started = false;
-      let flashDone = false;
-      let frameCount = 0;
-      let rafId = null;
-
-      // --- Create vortex element ---
       const vortexEl = document.getElementById('vortex');
-      vortexEl.style.left = (CX - 450) + 'px';
-      vortexEl.style.top = (CY - 450) + 'px';
-      vortexEl.style.width = '900px';
-      vortexEl.style.height = '900px';
-      vortexEl.style.opacity = '0';
-      vortexEl.style.background = 'conic-gradient(from 0deg, rgba(129,140,248,0.3), rgba(249,168,212,0.3), rgba(134,239,172,0.3), rgba(253,230,138,0.3), rgba(192,132,252,0.3), rgba(129,140,248,0.3))';
-
-      // --- Create flash element ---
       const flashEl = document.getElementById('flash');
-      flashEl.style.left = (CX - 600) + 'px';
-      flashEl.style.top = (CY - 600) + 'px';
-      flashEl.style.width = '1200px';
-      flashEl.style.height = '1200px';
-      flashEl.style.opacity = '0';
+      let scatter = [];
+      let explosion = [];
+      let ghosts = [];
+      let flashDone = false;
 
-      // --- PHASE 1: SCATTER ---
-      const SCATTER_COUNT = 52 + Math.floor(Math.random() * 18);
-      for (let i = 0; i < SCATTER_COUNT; i++) {
-        const el = document.createElement('div');
-        el.className = 'particle';
-        const text = pick(KAOMOJI_PARTS);
-        el.textContent = text;
-        const size = rand(72, 144);
-        el.style.fontSize = size + 'px';
-        const color = pick(SCATTER_COLORS);
-        el.style.color = color;
-        el.style.opacity = '0';
-
-        const x = rand(50, W - 50);
-        const y = rand(50, H - 50);
-        el.style.left = x + 'px';
-        el.style.top = y + 'px';
-
-        // Pop animation: scale 0 -> 1 with bounce
-        el.style.transform = 'scale(0)';
-
-        document.body.appendChild(el);
-
-        elements.push({
-          el,
-          x,
-          y,
+      const scatterCount = runtime.scaleCount(52 + Math.floor(Math.random() * 18), 38);
+      for (let i = 0; i < scatterCount; i++) {
+        scatter.push({
+          text: pick(KAOMOJI_PARTS),
+          x: rand(50, W() - 50),
+          y: rand(50, H() - 50),
           vx: rand(-1.8, 1.8),
           vy: rand(-1.8, 1.8),
-          size,
-          color,
+          size: rand(72, 144),
+          color: pick(SCATTER_COLORS),
           rotation: 0,
           rotSpeed: rand(-0.5, 0.5),
-          opacity: 0,
-          phase: 'scatter',
-          popped: false,
           popDelay: rand(0, DURATION * 0.08),
-          baseHue: 0,
-          absorbed: false
+          absorbed: false,
+          hue: 0
         });
       }
 
-      function animate(now) {
+      function drawText(p, opacity, scale = 1, shadow = 18) {
+        ctx.save();
+        ctx.globalAlpha = opacity;
+        ctx.translate(p.x, p.y);
+        ctx.rotate(p.rotation || 0);
+        ctx.scale(scale, scale);
+        ctx.font = `${p.size}px "Segoe UI Emoji", "Apple Color Emoji", "Microsoft YaHei", sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillStyle = p.color;
+        ctx.shadowColor = p.color;
+        ctx.shadowBlur = shadow * runtime.state.quality;
+        ctx.fillText(p.text, 0, 0);
+        ctx.restore();
+      }
+
+      function spawnGhost(p) {
+        ghosts.push({ text: p.text, x: p.x, y: p.y, size: p.size, color: p.color, rotation: p.rotation, born: performance.now() });
+      }
+
+      runtime.requestEffectFrame((now, state) => {
         const elapsed = now - startTime;
         const progress = Math.min(elapsed / DURATION, 1);
-        frameCount++;
+        ctx.clearRect(0, 0, W(), H());
 
-        // --- PHASE 1: SCATTER (0 - 15%) ---
         if (progress < PHASE1_END) {
-          const phaseProgress = progress / PHASE1_END;
-
-          for (const p of elements) {
-            // Handle pop-in with delay
-            if (!p.popped) {
-              if (elapsed >= p.popDelay) {
-                p.popped = true;
-                p.opacity = 1;
-                // Bounce ease pop
-                const popDuration = 400;
-                const popStart = now;
-                const popEl = p.el;
-                const popAnim = () => {
-                  const t = Math.min((performance.now() - popStart) / popDuration, 1);
-                  // Bounce easing
-                  const scale = t < 0.6
-                    ? (t / 0.6) * 1.15
-                    : 1.15 - 0.15 * ((t - 0.6) / 0.4);
-                  popEl.style.transform = `scale(${scale})`;
-                  popEl.style.opacity = '1';
-                  if (t < 1) requestAnimationFrame(popAnim);
-                  else popEl.style.transform = 'scale(1)';
-                };
-                requestAnimationFrame(popAnim);
-              }
-              continue;
-            }
-
-            // Gentle drift
+          for (const p of scatter) {
+            if (elapsed < p.popDelay) continue;
+            const popT = Math.min((elapsed - p.popDelay) / 400, 1);
+            const scale = popT < 0.6 ? (popT / 0.6) * 1.15 : 1.15 - 0.15 * ((popT - 0.6) / 0.4);
             p.x += p.vx;
             p.y += p.vy;
-
-            // Bounce off edges gently
-            if (p.x < 10 || p.x > W - 10) p.vx *= -1;
-            if (p.y < 10 || p.y > H - 10) p.vy *= -1;
-            p.x = Math.max(10, Math.min(W - 10, p.x));
-            p.y = Math.max(10, Math.min(H - 10, p.y));
-
-            p.el.style.left = p.x + 'px';
-            p.el.style.top = p.y + 'px';
+            if (p.x < 10 || p.x > W() - 10) p.vx *= -1;
+            if (p.y < 10 || p.y > H() - 10) p.vy *= -1;
+            p.x = Math.max(10, Math.min(W() - 10, p.x));
+            p.y = Math.max(10, Math.min(H() - 10, p.y));
+            drawText(p, popT, scale, 10);
           }
         }
 
-        // --- PHASE 2: VORTEX (15% - 75%) ---
         if (progress >= PHASE1_END && progress < PHASE2_END) {
           const phaseProgress = (progress - PHASE1_END) / (PHASE2_END - PHASE1_END);
-
-          // Ensure all elements have popped
-          for (const p of elements) {
-            if (!p.popped) {
-              p.popped = true;
-              p.opacity = 1;
-              p.el.style.opacity = '1';
-              p.el.style.transform = 'scale(1)';
-            }
-          }
-
-          // Show and rotate vortex
           const vortexOpacity = lerp(0.25, 0.55, phaseProgress);
-          const vortexRotation = frameCount * 5.5;
-          vortexEl.style.opacity = vortexOpacity.toString();
-          vortexEl.style.transform = `rotate(${vortexRotation}deg)`;
-
-          // Scale vortex slightly
+          const vortexRotation = state.frame * 5.5;
           const vortexScale = lerp(1, 1.55, phaseProgress);
-          vortexEl.style.transform = `rotate(${vortexRotation}deg) scale(${vortexScale})`;
-
-          // Attraction strength increases over time
+          vortexEl.style.opacity = vortexOpacity.toString();
+          vortexEl.style.transform = `translate(-50%, -50%) rotate(${vortexRotation}deg) scale(${vortexScale})`;
           const attractionStrength = lerp(0.08, 1.18, phaseProgress);
           const baseTangentialSpeed = lerp(3.2, 8.5, phaseProgress);
 
-          for (const p of elements) {
+          for (const p of scatter) {
             if (p.absorbed) continue;
-
-            const dx = CX - p.x;
-            const dy = CY - p.y;
-            const dist = Math.sqrt(dx * dx + dy * dy);
-
-            if (dist < 1) continue;
-
-            // Normalize radial direction
+            const dx = CX() - p.x;
+            const dy = CY() - p.y;
+            const dist = Math.max(1, Math.hypot(dx, dy));
             const nx = dx / dist;
             const ny = dy / dist;
-
-            // Tangential direction (perpendicular, clockwise)
             const tx = -ny;
             const ty = nx;
-
-            // Radial attraction (increasing over time)
-            const radialAccel = attractionStrength;
-            p.vx += nx * radialAccel;
-            p.vy += ny * radialAccel;
-
-            // Tangential speed — faster when closer (angular momentum feel)
-            const branchWave = Math.sin(frameCount * 0.08 + p.size * 0.1) * 0.55;
+            const branchWave = Math.sin(state.frame * 0.08 + p.size * 0.1) * 0.55;
             const tangentialSpeed = baseTangentialSpeed * Math.max(1, 220 / Math.max(dist, 90));
+            p.vx += nx * attractionStrength;
+            p.vy += ny * attractionStrength;
             p.vx += tx * tangentialSpeed * (0.13 + branchWave * 0.03);
             p.vy += ty * tangentialSpeed * (0.13 + branchWave * 0.03);
-            p.vx += Math.cos(frameCount * 0.12 + p.rotSpeed * 9) * 0.42;
-            p.vy += Math.sin(frameCount * 0.11 + p.rotSpeed * 7) * 0.42;
-
-            // Apply velocity
-            p.x += p.vx;
-            p.y += p.vy;
-
-            // Damping to prevent runaway speeds
-            const speed = Math.sqrt(p.vx * p.vx + p.vy * p.vy);
+            p.vx += Math.cos(state.frame * 0.12 + p.rotSpeed * 9) * 0.42;
+            p.vy += Math.sin(state.frame * 0.11 + p.rotSpeed * 7) * 0.42;
+            const speed = Math.hypot(p.vx, p.vy);
             if (speed > 24) {
               p.vx *= 24 / speed;
               p.vy *= 24 / speed;
             }
-
-            // Rotation
-            p.rotation += p.rotSpeed + p.vx * 0.5;
-
-            // Scale decreases as approaching center
-            const scale = lerp(1.0, 0.3, Math.max(0, 1 - dist / (Math.max(W, H) * 0.5)));
-            const safeScale = Math.max(0.05, scale);
-
-            // Opacity pulses
-            const pulsePhase = (frameCount * 0.1 + p.rotSpeed * 10) % (Math.PI * 2);
-            const opacity = lerp(0.5, 1.0, 0.5 + 0.5 * Math.sin(pulsePhase));
-
-            // Hue rotation increases over time
-            p.baseHue = (p.baseHue + 2) % 360;
-
-            // Apply styles
-            p.el.style.left = p.x + 'px';
-            p.el.style.top = p.y + 'px';
-            p.el.style.transform = `scale(${safeScale}) rotate(${p.rotation}deg)`;
-            p.el.style.opacity = opacity.toString();
-            p.el.style.filter = `hue-rotate(${p.baseHue}deg)`;
-
-            if (frameCount % 5 === 0 && phaseProgress > 0.25) {
-              spawnGhost(p);
-            }
-
-            // Absorbed when within center core
-            if (dist < 70) {
-              p.absorbed = true;
-              p.el.style.transition = 'transform 0.2s ease-in, opacity 0.2s ease-in';
-              p.el.style.transform = 'scale(0)';
-              p.el.style.opacity = '0';
-              setTimeout(() => {
-                if (p.el.parentNode) p.el.remove();
-              }, 250);
-            }
+            p.x += p.vx;
+            p.y += p.vy;
+            p.rotation += p.rotSpeed + p.vx * 0.008;
+            p.hue = (p.hue + 2) % 360;
+            const scale = Math.max(0.05, lerp(1.0, 0.3, Math.max(0, 1 - dist / (Math.max(W(), H()) * 0.5))));
+            const opacity = lerp(0.5, 1.0, 0.5 + 0.5 * Math.sin(state.frame * 0.1 + p.rotSpeed * 10));
+            drawText(p, opacity, scale, 16);
+            if (state.frame % Math.round(5 / Math.max(0.65, state.quality)) === 0 && phaseProgress > 0.25 && runtime.chance(0.8)) spawnGhost(p);
+            if (dist < 70) p.absorbed = true;
           }
         }
 
-        // --- PHASE 3: EXPLOSION (75% - 100%) ---
         if (progress >= PHASE2_END) {
           const phaseProgress = (progress - PHASE2_END) / (1 - PHASE2_END);
-
-          // Initial flash
           if (!flashDone) {
             flashDone = true;
-            // Remove any remaining scatter elements
-            for (const p of elements) {
-              if (p.el.parentNode) p.el.remove();
-            }
-            // Hide vortex
             vortexEl.style.opacity = '0';
-
-            // Flash animation: opacity 0 -> 1 -> 0 over 200ms
             flashEl.style.transition = 'opacity 0.1s ease-in';
             flashEl.style.opacity = '0.9';
             setTimeout(() => {
               flashEl.style.transition = 'opacity 0.1s ease-out';
               flashEl.style.opacity = '0';
             }, 100);
-
-            // Create explosion particles
-            const EXPLOSION_COUNT = 120 + Math.floor(Math.random() * 46);
-            for (let i = 0; i < EXPLOSION_COUNT; i++) {
-              const el = document.createElement('div');
-              el.className = 'particle';
-              el.textContent = pick(EXPLOSION_FRAGMENTS);
-              const size = rand(48, 108);
-              el.style.fontSize = size + 'px';
-
+            const count = runtime.scaleCount(120 + Math.floor(Math.random() * 46), 72);
+            for (let i = 0; i < count; i++) {
               const hue = Math.floor(rand(0, 360));
-              el.style.color = `hsl(${hue}, 90%, 65%)`;
-              el.style.textShadow = `0 0 24px hsl(${hue}, 90%, 65%)`;
-
-              el.style.left = CX + 'px';
-              el.style.top = CY + 'px';
-              el.style.opacity = '1';
-
-              document.body.appendChild(el);
-
               const angle = rand(0, Math.PI * 2);
               const speed = rand(12, 30);
-
-              explosionParticles.push({
-                el,
-                x: CX,
-                y: CY,
+              explosion.push({
+                text: pick(EXPLOSION_FRAGMENTS),
+                x: CX(), y: CY(),
                 vx: Math.cos(angle) * speed,
                 vy: Math.sin(angle) * speed,
-                size,
+                size: rand(48, 108),
+                color: `hsl(${hue}, 90%, 65%)`,
                 rotation: 0,
-                rotSpeed: rand(-8, 8),
-                opacity: 1,
-                hue,
+                rotSpeed: rand(-0.14, 0.14),
                 ghostTimer: 0
               });
             }
           }
 
-          // Animate explosion particles
-          for (let i = explosionParticles.length - 1; i >= 0; i--) {
-            const p = explosionParticles[i];
-
-            // Friction
-            p.vx *= 0.98;
-            p.vy *= 0.98;
-
-            p.x += p.vx;
-            p.y += p.vy;
+          for (let i = explosion.length - 1; i >= 0; i--) {
+            const p = explosion[i];
+            p.vx *= 0.98; p.vy *= 0.98;
+            p.x += p.vx; p.y += p.vy;
             p.rotation += p.rotSpeed;
             p.rotSpeed *= 0.99;
-
-            // Fade out over remaining duration
-            p.opacity = Math.max(0, 1 - phaseProgress);
-
-            // Spawn ghost every 2 frames
+            const opacity = Math.max(0, 1 - phaseProgress);
+            drawText(p, opacity, 1, 24);
             p.ghostTimer++;
-            if (p.ghostTimer >= 2 && p.opacity > 0.1) {
+            if (p.ghostTimer >= Math.round(2 / Math.max(0.65, state.quality)) && opacity > 0.1 && runtime.chance(0.75)) {
               p.ghostTimer = 0;
               spawnGhost(p);
             }
-
-            // Remove if off-screen
-            if (p.x < -50 || p.x > W + 50 || p.y < -50 || p.y > H + 50) {
-              if (p.el.parentNode) p.el.remove();
-              explosionParticles.splice(i, 1);
-              continue;
-            }
-
-            p.el.style.left = p.x + 'px';
-            p.el.style.top = p.y + 'px';
-            p.el.style.transform = `rotate(${p.rotation}deg)`;
-            p.el.style.opacity = p.opacity.toString();
-          }
-
-          // Clean up old ghosts
-          for (let i = ghosts.length - 1; i >= 0; i--) {
-            const g = ghosts[i];
-            const gAge = now - g.born;
-            if (gAge > 400) {
-              if (g.el.parentNode) g.el.remove();
-              ghosts.splice(i, 1);
-            } else {
-              const gOpacity = Math.max(0, 0.3 * (1 - gAge / 400));
-              g.el.style.opacity = gOpacity.toString();
-            }
+            if (p.x < -80 || p.x > W() + 80 || p.y < -80 || p.y > H() + 80) explosion.splice(i, 1);
           }
         }
 
-        // --- End check ---
+        for (let i = ghosts.length - 1; i >= 0; i--) {
+          const g = ghosts[i];
+          const age = now - g.born;
+          if (age > 400) {
+            ghosts.splice(i, 1);
+          } else {
+            drawText(g, 0.3 * (1 - age / 400), 1, 8);
+          }
+        }
+
+        ctx.globalAlpha = 1;
+        ctx.shadowBlur = 0;
+
         if (progress >= 1) {
-          // Clean up everything
-          cancelAnimationFrame(rafId);
-          for (const p of elements) { if (p.el.parentNode) p.el.remove(); }
-          for (const p of explosionParticles) { if (p.el.parentNode) p.el.remove(); }
-          for (const g of ghosts) { if (g.el.parentNode) g.el.remove(); }
+          runtime.stop();
           vortexEl.style.opacity = '0';
           flashEl.style.opacity = '0';
           setTimeout(() => window.close(), 100);
-          return;
         }
-
-        rafId = requestAnimationFrame(animate);
-      }
-
-      function spawnGhost(p) {
-        const el = document.createElement('div');
-        el.className = 'ghost';
-        el.textContent = p.el.textContent;
-        el.style.fontSize = p.size + 'px';
-        el.style.color = p.el.style.color;
-        el.style.left = p.x + 'px';
-        el.style.top = p.y + 'px';
-        el.style.opacity = '0.3';
-        el.style.transform = `rotate(${p.rotation}deg)`;
-        document.body.appendChild(el);
-        ghosts.push({ el, born: performance.now() });
-      }
-
-      rafId = requestAnimationFrame(animate);
+      });
     });
   </script>
 </body>

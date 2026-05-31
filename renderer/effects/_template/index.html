@@ -6,18 +6,43 @@
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; user-select: none; }
     html, body { width: 100%; height: 100%; overflow: hidden; background: transparent; }
-    #effect { position: fixed; inset: 0; display: grid; place-items: center; font-size: 64px; }
+    canvas { display: block; width: 100%; height: 100%; }
   </style>
 </head>
 <body>
-  <div id="effect">✨</div>
+  <canvas id="fx"></canvas>
+  <script src="../_shared/effect-runtime.js"></script>
   <script>
     const { ipcRenderer } = require('electron');
 
     ipcRenderer.on('effect:start', (event, { duration, params }) => {
-      const el = document.getElementById('effect');
-      el.textContent = params.symbol || '✨';
-      setTimeout(() => window.close(), duration || 5000);
+      const runtime = EffectRuntime.createRuntime({
+        id: 'my-effect',
+        adaptiveQuality: true,
+        minQuality: 0.6,
+        targetFps: 60
+      });
+      const { ctx } = EffectRuntime.createHiDpiCanvas(document.getElementById('fx'));
+      const startedAt = performance.now();
+      const symbol = params.symbol || '✨';
+
+      runtime.requestEffectFrame((now) => {
+        const elapsed = now - startedAt;
+        const fade = Math.max(0, Math.min(1, ((duration || 5000) - elapsed) / 600));
+        ctx.clearRect(0, 0, window.innerWidth, window.innerHeight);
+        ctx.globalAlpha = fade;
+        ctx.font = '64px "Segoe UI Emoji", sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillStyle = '#fde68a';
+        ctx.shadowColor = '#fde68a';
+        ctx.shadowBlur = 20 * runtime.state.quality;
+        ctx.fillText(symbol, window.innerWidth / 2, window.innerHeight / 2);
+        if (elapsed >= (duration || 5000)) {
+          runtime.stop();
+          window.close();
+        }
+      });
     });
   </script>
 </body>

@@ -19,6 +19,29 @@ function configureChromelessWindow(win) {
   if (typeof win.setMenu === 'function') win.setMenu(null);
 }
 
+function toWindowCoord(value) {
+  const n = Number(value);
+  return Number.isFinite(n) ? Math.round(n) : null;
+}
+
+function setWindowPositionSafe(win, x, y) {
+  if (!win || win.isDestroyed()) return false;
+  const safeX = toWindowCoord(x);
+  const safeY = toWindowCoord(y);
+  if (safeX === null || safeY === null) return false;
+  win.setPosition(safeX, safeY);
+  return true;
+}
+
+function setWindowSizeSafe(win, width, height) {
+  if (!win || win.isDestroyed()) return false;
+  const safeWidth = toWindowCoord(width);
+  const safeHeight = toWindowCoord(height);
+  if (safeWidth === null || safeHeight === null) return false;
+  win.setSize(Math.max(1, safeWidth), Math.max(1, safeHeight));
+  return true;
+}
+
 const effectsDir = path.join(__dirname, 'renderer', 'effects');
 
 function readJsonFile(filePath) {
@@ -78,6 +101,7 @@ function getBigEffectSummaries() {
     version: effect.version || '1.0.0',
     description: effect.description || '',
     duration: effect.duration || getDefaultParams(effect).duration || 4000,
+    performance: effect.performance || null,
     params: effect.params || {},
     pet: effect.pet || {},
     petAnimation: effect.pet?.animation || effect.petAnimation || null,
@@ -107,7 +131,8 @@ function createEffectWindow(effect, resolvedParams) {
     backgroundColor: '#00000000',
     webPreferences: {
       nodeIntegration: true,
-      contextIsolation: false
+      contextIsolation: false,
+      backgroundThrottling: false
     }
   });
 
@@ -160,6 +185,11 @@ function runBigEffect(effectId, params = {}) {
 
   return { success: true };
 }
+
+ipcMain.handle('gpu:status', () => ({
+  featureStatus: app.getGPUFeatureStatus(),
+  appMetrics: app.getAppMetrics()
+}));
 
 function createMainWindow() {
   const { width: screenWidth, height: screenHeight } = screen.getPrimaryDisplay().workAreaSize;
@@ -324,13 +354,13 @@ function stopSystemMonitor() {
 ipcMain.on('window-move', (event, { deltaX, deltaY }) => {
   if (mainWindow) {
     const [x, y] = mainWindow.getPosition();
-    mainWindow.setPosition(x + deltaX, y + deltaY);
+    setWindowPositionSafe(mainWindow, x + deltaX, y + deltaY);
   }
 });
 
 ipcMain.on('set-window-position', (event, { x, y }) => {
   if (mainWindow && !mainWindow.isDestroyed()) {
-    mainWindow.setPosition(Math.round(x), Math.round(y));
+    setWindowPositionSafe(mainWindow, x, y);
   }
 });
 
@@ -408,7 +438,7 @@ ipcMain.on('move-window-to', (event, { targetX, targetY, curveType, step }) => {
 
   // Handle legacy 'step' parameter for jump (large number = instant)
   if ((typeof step === 'number' && step > 100) || (typeof curveType === 'number' && curveType > 100)) {
-    mainWindow.setPosition(Math.round(targetX), Math.round(targetY));
+    setWindowPositionSafe(mainWindow, targetX, targetY);
     mainWindow.webContents.send('walk-done');
     return;
   }
@@ -429,7 +459,7 @@ ipcMain.on('move-window-to', (event, { targetX, targetY, curveType, step }) => {
     wpIndex += speed;
 
     if (wpIndex >= waypoints.length) {
-      mainWindow.setPosition(targetX, targetY);
+      setWindowPositionSafe(mainWindow, targetX, targetY);
       clearInterval(moveAnimTimer);
       moveAnimTimer = null;
       mainWindow.webContents.send('walk-done');
@@ -437,7 +467,7 @@ ipcMain.on('move-window-to', (event, { targetX, targetY, curveType, step }) => {
     }
 
     const wp = waypoints[wpIndex];
-    mainWindow.setPosition(Math.round(wp.x), Math.round(wp.y));
+    setWindowPositionSafe(mainWindow, wp.x, wp.y);
   }, 30);
 });
 
@@ -472,7 +502,7 @@ ipcMain.handle('get-window-size', () => {
 
 ipcMain.on('resize-window', (event, { width, height }) => {
   if (mainWindow && !mainWindow.isDestroyed()) {
-    mainWindow.setSize(Math.round(width), Math.round(height));
+    setWindowSizeSafe(mainWindow, width, height);
   }
 });
 

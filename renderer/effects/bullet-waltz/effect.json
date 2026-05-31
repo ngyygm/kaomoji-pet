@@ -8,6 +8,13 @@
   "entry": "index.html",
   "startChannel": "show-bullet-waltz",
   "duration": 16000,
+  "performance": {
+    "renderer": "canvas",
+    "adaptiveQuality": true,
+    "maxParticles": 1400,
+    "targetFps": 60,
+    "minQuality": 0.48
+  },
   "window": {
     "type": "fullscreen-transparent",
     "clickThrough": true,

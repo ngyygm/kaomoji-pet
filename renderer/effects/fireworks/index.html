@@ -4,634 +4,247 @@
   <meta charset="UTF-8">
   <title> </title>
   <style>
-    * { margin: 0; padding: 0; user-select: none; }
-    html, body {
-      width: 100%;
-      height: 100%;
-      overflow: hidden;
-      background: transparent;
-      border: none;
-      outline: none;
-    }
-    #canvas-container {
-      position: fixed;
-      top: 0; left: 0;
-      width: 100%; height: 100%;
-      pointer-events: none;
-    }
-    .particle {
-      position: absolute;
-      border-radius: 50%;
-      pointer-events: none;
-      will-change: transform, opacity;
-    }
-    .shell {
-      position: absolute;
-      border-radius: 50%;
-      pointer-events: none;
-      will-change: transform;
-    }
-    .ghost {
-      position: absolute;
-      border-radius: 50%;
-      pointer-events: none;
-      animation: ghostFade 400ms ease-out forwards;
-    }
-    @keyframes ghostFade {
-      from { opacity: 0.6; }
-      to { opacity: 0; }
-    }
-    .flash-overlay {
-      position: fixed;
-      top: 0; left: 0;
-      width: 100%; height: 100%;
-      pointer-events: none;
-      opacity: 0;
-      transition: opacity 0.1s ease-out;
-    }
-    #fade-overlay {
-      position: fixed;
-      top: 0; left: 0;
-      width: 100%; height: 100%;
-      pointer-events: none;
-      background: transparent;
-      opacity: 1;
-      transition: opacity 800ms ease-out;
-    }
+    * { margin: 0; padding: 0; user-select: none; box-sizing: border-box; }
+    html, body { width: 100%; height: 100%; overflow: hidden; background: transparent; border: none; outline: none; }
+    canvas { display: block; width: 100%; height: 100%; }
   </style>
 </head>
 <body>
-  <div id="canvas-container"></div>
-  <div id="fade-overlay"></div>
+  <canvas id="fx"></canvas>
+  <script src="../_shared/effect-runtime.js"></script>
   <script>
     const { ipcRenderer } = require('electron');
-    const container = document.getElementById('canvas-container');
-    const fadeOverlay = document.getElementById('fade-overlay');
 
-    const W = () => window.innerWidth;
-    const H = () => window.innerHeight;
+    ipcRenderer.on('show-fireworks', (event, opts = {}) => startShow(opts.duration || 16000));
 
-    // ---- State ----
-    let shells = [];
-    let particles = [];
-    let subShells = []; // secondary explosion sparks waiting to burst
-    let running = false;
-    let showStartTime = 0;
-    let showDuration = 12000;
-    let baseHue = 0;
-    let rafId = null;
-
-    // ---- Utilities ----
-    function rand(a, b) { return a + Math.random() * (b - a); }
-    function randInt(a, b) { return Math.floor(rand(a, b + 1)); }
-    function pick(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
-    function hsl(h, s, l) { return `hsl(${h}, ${s}%, ${l}%)`; }
-    function hsla(h, s, l, a) { return `hsla(${h}, ${s}%, ${l}%, ${a})`; }
-
-    function hslToRgb(h, s, l) {
-      h /= 360; s /= 100; l /= 100;
-      let r, g, b;
-      if (s === 0) { r = g = b = l; }
-      else {
-        const hue2rgb = (p, q, t) => {
-          if (t < 0) t += 1; if (t > 1) t -= 1;
-          if (t < 1/6) return p + (q - p) * 6 * t;
-          if (t < 1/2) return q;
-          if (t < 2/3) return p + (q - p) * (2/3 - t) * 6;
-          return p;
-        };
-        const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
-        const p = 2 * l - q;
-        r = hue2rgb(p, q, h + 1/3);
-        g = hue2rgb(p, q, h);
-        b = hue2rgb(p, q, h - 1/3);
-      }
-      return [Math.round(r * 255), Math.round(g * 255), Math.round(b * 255)];
-    }
-
-    function rgbStr(h, s, l) {
-      const [r, g, b] = hslToRgb(h, s, l);
-      return `rgb(${r},${g},${b})`;
-    }
-
-    // ---- Shell Element ----
-    function createShellEl(x, y, color) {
-      const el = document.createElement('div');
-      el.className = 'shell';
-      el.style.width = '4px';
-      el.style.height = '4px';
-      el.style.background = color;
-      el.style.boxShadow = `0 0 6px ${color}, 0 0 12px ${color}`;
-      el.style.left = x + 'px';
-      el.style.top = y + 'px';
-      container.appendChild(el);
-      return el;
-    }
-
-    // ---- Particle Element ----
-    function createParticleEl(x, y, color, size) {
-      const el = document.createElement('div');
-      el.className = 'particle';
-      el.style.width = size + 'px';
-      el.style.height = size + 'px';
-      el.style.background = color;
-      el.style.boxShadow = `0 0 ${size + 2}px ${color}`;
-      el.style.left = x + 'px';
-      el.style.top = y + 'px';
-      container.appendChild(el);
-      return el;
-    }
-
-    // ---- Ghost Trail ----
-    function spawnGhost(x, y, color, size) {
-      const el = document.createElement('div');
-      el.className = 'ghost';
-      el.style.width = size + 'px';
-      el.style.height = size + 'px';
-      el.style.background = color;
-      el.style.left = x + 'px';
-      el.style.top = y + 'px';
-      container.appendChild(el);
-      setTimeout(() => el.remove(), 400);
-    }
-
-    // ---- Launch a shell ----
-    function launchShell() {
-      const screenW = W();
-      const screenH = H();
-      const startX = rand(screenW * 0.1, screenW * 0.9);
-      const startY = screenH - 20;
-      const targetY = rand(screenH * 0.1, screenH * 0.5);
-      const riseDuration = rand(1100, 1800);
-
-      baseHue = (baseHue + rand(40, 80)) % 360;
-      const shellHue = baseHue;
-      const shellColor = hsl(shellHue, 90, 80);
-      const el = createShellEl(startX, startY, shellColor);
-
-      const burstType = pick(['chrysanthemum', 'willow', 'heart', 'double-ring', 'peony',
-                               'chrysanthemum', 'peony']); // weight chrysanthemum and peony more
-
-      const isCluster = Math.random() < 0.35;
-
-      const shell = {
-        el,
-        startX,
-        startY,
-        targetY,
-        riseDuration,
-        startTime: performance.now(),
-        hue: shellHue,
-        color: shellColor,
-        burstType,
-        isCluster,
-        wobblePhase: rand(0, Math.PI * 2),
-        trailTimer: 0,
-        alive: true
-      };
-      shells.push(shell);
-    }
-
-    // ---- Burst: create particles at (x, y) ----
-    function burstShell(shell) {
-      shell.el.remove();
-      shell.alive = false;
-      const x = parseFloat(shell.el.style.left);
-      const y = parseFloat(shell.el.style.top);
-
-      // Flash
-      flashScreen(shell.color, 0.15, 150);
-
-      if (shell.isCluster) {
-        // Cluster shell: spawn large sparks that burst again.
-        const sparkCount = randInt(7, 12);
-        for (let i = 0; i < sparkCount; i++) {
-          const angle = (Math.PI * 2 / sparkCount) * i + rand(-0.2, 0.2);
-          const speed = rand(4, 7);
-          const sparkHue = shell.hue + rand(-20, 20);
-          const color = hsl(sparkHue, 90, 70);
-          const el = createParticleEl(x, y, color, 5);
-          subShells.push({
-            el,
-            x, y,
-            vx: Math.cos(angle) * speed,
-            vy: Math.sin(angle) * speed,
-            color,
-            hue: sparkHue,
-            burstTime: performance.now() + rand(300, 550),
-            alive: true
-          });
-        }
-        return;
-      }
-
-      const type = shell.burstType;
-      switch (type) {
-        case 'chrysanthemum': burstChrysanthemum(x, y, shell.hue); break;
-        case 'willow': burstWillow(x, y, shell.hue); break;
-        case 'heart': burstHeart(x, y, shell.hue); break;
-        case 'double-ring': burstDoubleRing(x, y, shell.hue); break;
-        case 'peony': burstPeony(x, y, shell.hue); break;
-        default: burstChrysanthemum(x, y, shell.hue);
-      }
-    }
-
-    // ---- Burst Types ----
-
-    function burstChrysanthemum(x, y, hue) {
-      const count = randInt(70, 95);
-      for (let i = 0; i < count; i++) {
-        const angle = (Math.PI * 2 / count) * i + rand(-0.05, 0.05);
-        const speed = rand(4, 8);
-        const pHue = hue + rand(-15, 15);
-        const color = hsl(pHue, 85, 65);
-        const size = rand(3, 5);
-        const el = createParticleEl(x, y, color, size);
-        particles.push({
-          el, x, y,
-          vx: Math.cos(angle) * speed,
-          vy: Math.sin(angle) * speed,
-          color,
-          hue: pHue,
-          size,
-          life: 0,
-          maxLife: rand(80, 120),
-          gravity: 0.03,
-          friction: 0.97,
-          trailInterval: 2,
-          frameCount: 0,
-          alive: true,
-          colorShift: false
-        });
-      }
-    }
-
-    function burstWillow(x, y, hue) {
-      const count = randInt(52, 72);
-      const willowColors = ['#fde68a', '#fbbf24', '#fb923c'];
-      for (let i = 0; i < count; i++) {
-        // Dome pattern: angles from 200 to 340 degrees from vertical (i.e., upward spread)
-        const angle = -Math.PI / 2 + rand(-1.2, 1.2); // centered upward
-        const speed = rand(6, 10);
-        const color = pick(willowColors);
-        const size = rand(3, 5);
-        const el = createParticleEl(x, y, color, size);
-        particles.push({
-          el, x, y,
-          vx: Math.cos(angle) * speed,
-          vy: Math.sin(angle) * speed,
-          color,
-          hue: hue,
-          size,
-          life: 0,
-          maxLife: rand(90, 140),
-          gravity: 0.08,
-          friction: 0.97,
-          trailInterval: 2,
-          frameCount: 0,
-          alive: true,
-          colorShift: false
-        });
-      }
-    }
-
-    function burstHeart(x, y, hue) {
-      const heartColors = ['#f9a8d4', '#f472b6', '#f87171', '#e879f9'];
-      const count = 54;
-      const scale = 8;
-      for (let i = 0; i < count; i++) {
-        const t = (Math.PI * 2 / count) * i;
-        // Parametric heart curve
-        const hx = 16 * Math.pow(Math.sin(t), 3);
-        const hy = -(13 * Math.cos(t) - 5 * Math.cos(2 * t) - 2 * Math.cos(3 * t) - Math.cos(4 * t));
-        const dirX = hx * scale;
-        const dirY = hy * scale;
-        const len = Math.sqrt(dirX * dirX + dirY * dirY);
-        const speed = 4.2;
-        const vx = (dirX / len) * speed;
-        const vy = (dirY / len) * speed;
-        const color = pick(heartColors);
-        const size = rand(3, 5);
-        const el = createParticleEl(x, y, color, size);
-        particles.push({
-          el, x, y,
-          vx, vy,
-          color,
-          hue: hue,
-          size,
-          life: 0,
-          maxLife: rand(70, 110),
-          gravity: 0.02,
-          friction: 0.96,
-          trailInterval: 3,
-          frameCount: 0,
-          alive: true,
-          colorShift: false
-        });
-      }
-    }
-
-    function burstDoubleRing(x, y, hue) {
-      const hue2 = (hue + 150) % 360;
-      // Inner ring
-      const innerCount = 20;
-      for (let i = 0; i < innerCount; i++) {
-        const angle = (Math.PI * 2 / innerCount) * i;
-        const speed = 3.4;
-        const color = hsl(hue, 85, 65);
-        const size = rand(3, 4);
-        const el = createParticleEl(x, y, color, size);
-        particles.push({
-          el, x, y,
-          vx: Math.cos(angle) * speed,
-          vy: Math.sin(angle) * speed,
-          color,
-          hue,
-          size,
-          life: 0,
-          maxLife: rand(70, 100),
-          gravity: 0.03,
-          friction: 0.96,
-          trailInterval: 3,
-          frameCount: 0,
-          alive: true,
-          colorShift: false
-        });
-      }
-      // Outer ring
-      const outerCount = 30;
-      for (let i = 0; i < outerCount; i++) {
-        const angle = (Math.PI * 2 / outerCount) * i;
-        const speed = 5.3;
-        const color = hsl(hue2, 85, 65);
-        const size = rand(3, 5);
-        const el = createParticleEl(x, y, color, size);
-        particles.push({
-          el, x, y,
-          vx: Math.cos(angle) * speed,
-          vy: Math.sin(angle) * speed,
-          color,
-          hue: hue2,
-          size,
-          life: 0,
-          maxLife: rand(70, 100),
-          gravity: 0.03,
-          friction: 0.96,
-          trailInterval: 3,
-          frameCount: 0,
-          alive: true,
-          colorShift: false
-        });
-      }
-    }
-
-    function burstPeony(x, y, hue) {
-      const count = randInt(86, 118);
-      for (let i = 0; i < count; i++) {
-        const angle = rand(0, Math.PI * 2);
-        const speed = rand(5, 10);
-        const pHue = hue + rand(-15, 15);
-        const color = hsl(pHue, 80, 55);
-        const size = rand(3, 6);
-        const el = createParticleEl(x, y, color, size);
-        particles.push({
-          el, x, y,
-          vx: Math.cos(angle) * speed,
-          vy: Math.sin(angle) * speed,
-          color,
-          hue: pHue,
-          size,
-          life: 0,
-          maxLife: rand(80, 130),
-          gravity: 0.04,
-          friction: 0.97,
-          trailInterval: 3,
-          frameCount: 0,
-          alive: true,
-          colorShift: true, // peony changes color mid-life
-          colorShiftAt: 30 // after 30 frames
-        });
-      }
-    }
-
-    // Mini burst for cluster sub-shells
-    function miniBurst(x, y, hue) {
-      const count = randInt(24, 34);
-      for (let i = 0; i < count; i++) {
-        const angle = rand(0, Math.PI * 2);
-        const speed = rand(2.4, 5.2);
-        const pHue = hue + rand(-15, 15);
-        const color = hsl(pHue, 85, 70);
-        const size = rand(2, 4);
-        const el = createParticleEl(x, y, color, size);
-        particles.push({
-          el, x, y,
-          vx: Math.cos(angle) * speed,
-          vy: Math.sin(angle) * speed,
-          color,
-          hue: pHue,
-          size,
-          life: 0,
-          maxLife: rand(40, 70),
-          gravity: 0.04,
-          friction: 0.96,
-          trailInterval: 4,
-          frameCount: 0,
-          alive: true,
-          colorShift: false
-        });
-      }
-    }
-
-    // ---- Flash ----
-    function flashScreen(color, intensity, duration) {
-      const flash = document.createElement('div');
-      flash.className = 'flash-overlay';
-      flash.style.background = color;
-      flash.style.opacity = intensity;
-      container.appendChild(flash);
-      setTimeout(() => { flash.style.opacity = '0'; }, 20);
-      setTimeout(() => flash.remove(), duration);
-    }
-
-    // ---- Launch scheduling ----
-    let nextLaunchTime = 0;
-
-    function getShowPhase(now) {
-      const elapsed = now - showStartTime;
-      const t = elapsed / showDuration;
-      if (t < 0.25) return 'warmup';
-      if (t < 0.65) return 'peak';
-      if (t < 0.85) return 'finale';
-      return 'cooldown';
-    }
-
-    function getLaunchInterval(phase) {
-      switch (phase) {
-        case 'warmup': return rand(600, 900);
-        case 'peak': return rand(360, 620);
-        case 'finale': return rand(160, 320);
-        case 'cooldown': return rand(600, 900);
-        default: return rand(420, 760);
-      }
-    }
-
-    function shouldForceCluster(phase) {
-      if (phase === 'finale') return Math.random() < 0.40;
-      return false;
-    }
-
-    // ---- Main animation loop ----
-    function animate(now) {
-      if (!running) return;
-      rafId = requestAnimationFrame(animate);
-
-      const elapsed = now - showStartTime;
-      const phase = getShowPhase(now);
-
-      // Schedule launches
-      if (now >= nextLaunchTime && elapsed < showDuration * 0.92) {
-        launchShell();
-        // Finale: frequent multi-launch volleys.
-        if (phase === 'finale') {
-          if (Math.random() < 0.9) launchShell();
-          if (Math.random() < 0.65) launchShell();
-          if (Math.random() < 0.35) launchShell();
-        }
-        nextLaunchTime = now + getLaunchInterval(phase);
-      }
-
-      // Update shells (rising)
-      for (let i = shells.length - 1; i >= 0; i--) {
-        const s = shells[i];
-        if (!s.alive) { shells.splice(i, 1); continue; }
-
-        const riseElapsed = now - s.startTime;
-        const progress = Math.min(riseElapsed / s.riseDuration, 1);
-        // Ease out quad for decelerating rise
-        const eased = 1 - (1 - progress) * (1 - progress);
-
-        const currentX = s.startX + Math.sin(s.wobblePhase + riseElapsed * 0.008) * 3;
-        const currentY = s.startY + (s.targetY - s.startY) * eased;
-
-        s.el.style.left = currentX + 'px';
-        s.el.style.top = currentY + 'px';
-
-        // Trail during rise
-        s.trailTimer++;
-        if (s.trailTimer % 2 === 0) {
-          spawnGhost(currentX, currentY + 2, s.color, 3);
-        }
-
-        if (progress >= 1) {
-          burstShell(s);
-          shells.splice(i, 1);
-        }
-      }
-
-      // Update sub-shells (cluster sparks before they burst)
-      for (let i = subShells.length - 1; i >= 0; i--) {
-        const ss = subShells[i];
-        if (!ss.alive) { subShells.splice(i, 1); continue; }
-
-        ss.x += ss.vx;
-        ss.y += ss.vy;
-        ss.vy += 0.03;
-        ss.vx *= 0.98;
-        ss.vy *= 0.98;
-
-        ss.el.style.left = ss.x + 'px';
-        ss.el.style.top = ss.y + 'px';
-
-        if (now >= ss.burstTime) {
-          ss.el.remove();
-          ss.alive = false;
-          miniBurst(ss.x, ss.y, ss.hue);
-          subShells.splice(i, 1);
-        }
-      }
-
-      // Update particles
-      for (let i = particles.length - 1; i >= 0; i--) {
-        const p = particles[i];
-        if (!p.alive) { particles.splice(i, 1); continue; }
-
-        p.vx *= p.friction;
-        p.vy *= p.friction;
-        p.vy += p.gravity;
-        p.x += p.vx;
-        p.y += p.vy;
-        p.life++;
-        p.frameCount++;
-
-        const lifeRatio = p.life / p.maxLife;
-        const opacity = Math.max(0, 1 - lifeRatio);
-
-        // Color shift for peony
-        if (p.colorShift && p.colorShiftAt && p.life === p.colorShiftAt) {
-          const newHue = (p.hue + 60) % 360;
-          const newColor = hsl(newHue, 80, 55);
-          p.color = newColor;
-          p.el.style.background = newColor;
-          p.el.style.boxShadow = `0 0 ${p.size + 2}px ${newColor}`;
-        }
-
-        p.el.style.left = p.x + 'px';
-        p.el.style.top = p.y + 'px';
-        p.el.style.opacity = opacity;
-
-        // Ghost trails
-        if (p.frameCount % p.trailInterval === 0 && lifeRatio < 0.7) {
-          spawnGhost(p.x, p.y, p.color, Math.max(1, p.size * 0.6));
-        }
-
-        if (p.life >= p.maxLife) {
-          p.el.remove();
-          p.alive = false;
-          particles.splice(i, 1);
-        }
-      }
-
-      // Check if show is done
-      if (elapsed >= showDuration && shells.length === 0 && particles.length === 0 && subShells.length === 0) {
-        endShow();
-      }
-    }
-
-    // ---- End show ----
-    function endShow() {
-      running = false;
-      if (rafId) { cancelAnimationFrame(rafId); rafId = null; }
-
-      // Fade all remaining elements
-      fadeOverlay.style.background = 'transparent';
-      container.style.transition = 'opacity 800ms ease-out';
-      container.style.opacity = '0';
-
-      setTimeout(() => {
-        window.close();
-      }, 900);
-    }
-
-    // ---- Start show ----
     function startShow(duration) {
-      showDuration = duration || 16000;
-      showStartTime = performance.now();
-      nextLaunchTime = showStartTime + 200;
-      baseHue = rand(0, 360);
-      running = true;
+      const runtime = EffectRuntime.createRuntime({ id: 'fireworks', adaptiveQuality: true, minQuality: 0.46, targetFps: 60 });
+      const { ctx } = EffectRuntime.createHiDpiCanvas(document.getElementById('fx'));
+      const W = () => window.innerWidth;
+      const H = () => window.innerHeight;
+      let shells = [];
+      let particles = [];
+      let subShells = [];
+      let ghosts = [];
+      let flashes = [];
+      let baseHue = Math.random() * 360;
+      let nextLaunchTime = performance.now() + 160;
+      const startedAt = performance.now();
 
-      container.style.opacity = '1';
-      container.style.transition = '';
+      function rand(a, b) { return a + Math.random() * (b - a); }
+      function randInt(a, b) { return Math.floor(rand(a, b + 1)); }
+      function pick(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+      function hsl(h, s, l) { return `hsl(${h}, ${s}%, ${l}%)`; }
 
-      rafId = requestAnimationFrame(animate);
+      function getPhase(elapsed) {
+        const t = elapsed / duration;
+        if (t < 0.25) return 'warmup';
+        if (t < 0.65) return 'peak';
+        if (t < 0.85) return 'finale';
+        return 'cooldown';
+      }
+
+      function getLaunchInterval(phase) {
+        const quality = Math.max(0.55, runtime.state.quality);
+        const scale = 1 / quality;
+        if (phase === 'warmup') return rand(600, 900) * scale;
+        if (phase === 'peak') return rand(360, 620) * scale;
+        if (phase === 'finale') return rand(160, 320) * scale;
+        return rand(600, 900) * scale;
+      }
+
+      function launchShell() {
+        const x = rand(W() * 0.1, W() * 0.9);
+        const y = H() - 20;
+        baseHue = (baseHue + rand(40, 80)) % 360;
+        shells.push({
+          x, y,
+          startX: x,
+          startY: y,
+          targetY: rand(H() * 0.1, H() * 0.5),
+          riseDuration: rand(1100, 1800),
+          startTime: performance.now(),
+          hue: baseHue,
+          color: hsl(baseHue, 90, 80),
+          burstType: pick(['chrysanthemum', 'willow', 'heart', 'double-ring', 'peony', 'chrysanthemum', 'peony']),
+          isCluster: Math.random() < 0.35,
+          wobble: rand(0, Math.PI * 2),
+          trailTimer: 0
+        });
+      }
+
+      function addParticle(x, y, vx, vy, color, hue, size, maxLife, gravity, friction, opts = {}) {
+        particles.push({ x, y, vx, vy, color, hue, size, life: 0, maxLife, gravity, friction, trailInterval: opts.trailInterval || 3, colorShift: opts.colorShift, colorShiftAt: opts.colorShiftAt || 30 });
+      }
+
+      function burstChrysanthemum(x, y, hue) {
+        const count = runtime.scaleCount(randInt(70, 95), 42);
+        for (let i = 0; i < count; i++) {
+          const a = (Math.PI * 2 / count) * i + rand(-0.05, 0.05);
+          const pHue = hue + rand(-15, 15);
+          addParticle(x, y, Math.cos(a) * rand(4, 8), Math.sin(a) * rand(4, 8), hsl(pHue, 85, 65), pHue, rand(3, 5), rand(80, 120), 0.03, 0.97, { trailInterval: 2 });
+        }
+      }
+
+      function burstWillow(x, y, hue) {
+        const colors = ['#fde68a', '#fbbf24', '#fb923c'];
+        const count = runtime.scaleCount(randInt(52, 72), 32);
+        for (let i = 0; i < count; i++) {
+          const a = -Math.PI / 2 + rand(-1.2, 1.2);
+          addParticle(x, y, Math.cos(a) * rand(6, 10), Math.sin(a) * rand(6, 10), pick(colors), hue, rand(3, 5), rand(90, 140), 0.08, 0.97, { trailInterval: 2 });
+        }
+      }
+
+      function burstHeart(x, y, hue) {
+        const colors = ['#f9a8d4', '#f472b6', '#f87171', '#e879f9'];
+        const count = runtime.scaleCount(54, 34);
+        for (let i = 0; i < count; i++) {
+          const t = (Math.PI * 2 / count) * i;
+          const hx = 16 * Math.pow(Math.sin(t), 3) * 8;
+          const hy = -(13 * Math.cos(t) - 5 * Math.cos(2 * t) - 2 * Math.cos(3 * t) - Math.cos(4 * t)) * 8;
+          const len = Math.max(1, Math.hypot(hx, hy));
+          addParticle(x, y, hx / len * 4.2, hy / len * 4.2, pick(colors), hue, rand(3, 5), rand(70, 110), 0.02, 0.96, { trailInterval: 3 });
+        }
+      }
+
+      function burstDoubleRing(x, y, hue) {
+        const rings = [{ count: 20, speed: 3.4, hue }, { count: 30, speed: 5.3, hue: (hue + 150) % 360 }];
+        for (const ring of rings) {
+          const count = runtime.scaleCount(ring.count, Math.ceil(ring.count * 0.65));
+          for (let i = 0; i < count; i++) {
+            const a = Math.PI * 2 / count * i;
+            addParticle(x, y, Math.cos(a) * ring.speed, Math.sin(a) * ring.speed, hsl(ring.hue, 85, 65), ring.hue, rand(3, 5), rand(70, 100), 0.03, 0.96, { trailInterval: 3 });
+          }
+        }
+      }
+
+      function burstPeony(x, y, hue) {
+        const count = runtime.scaleCount(randInt(86, 118), 52);
+        for (let i = 0; i < count; i++) {
+          const a = rand(0, Math.PI * 2);
+          const pHue = hue + rand(-15, 15);
+          addParticle(x, y, Math.cos(a) * rand(5, 10), Math.sin(a) * rand(5, 10), hsl(pHue, 80, 55), pHue, rand(3, 6), rand(80, 130), 0.04, 0.97, { colorShift: true, colorShiftAt: 30 });
+        }
+      }
+
+      function miniBurst(x, y, hue) {
+        const count = runtime.scaleCount(randInt(24, 34), 14);
+        for (let i = 0; i < count; i++) {
+          const a = rand(0, Math.PI * 2);
+          const pHue = hue + rand(-15, 15);
+          addParticle(x, y, Math.cos(a) * rand(2.4, 5.2), Math.sin(a) * rand(2.4, 5.2), hsl(pHue, 85, 70), pHue, rand(2, 4), rand(40, 70), 0.04, 0.96, { trailInterval: 4 });
+        }
+      }
+
+      function burstShell(s) {
+        flashes.push({ color: s.color, alpha: 0.15, life: 0, maxLife: 12 });
+        if (s.isCluster && runtime.chance(1)) {
+          const count = runtime.scaleCount(randInt(7, 12), 5);
+          for (let i = 0; i < count; i++) {
+            const a = (Math.PI * 2 / count) * i + rand(-0.2, 0.2);
+            subShells.push({ x: s.x, y: s.y, vx: Math.cos(a) * rand(4, 7), vy: Math.sin(a) * rand(4, 7), hue: s.hue + rand(-20, 20), burstTime: performance.now() + rand(300, 550), color: hsl(s.hue, 90, 70) });
+          }
+          return;
+        }
+        if (s.burstType === 'willow') burstWillow(s.x, s.y, s.hue);
+        else if (s.burstType === 'heart') burstHeart(s.x, s.y, s.hue);
+        else if (s.burstType === 'double-ring') burstDoubleRing(s.x, s.y, s.hue);
+        else if (s.burstType === 'peony') burstPeony(s.x, s.y, s.hue);
+        else burstChrysanthemum(s.x, s.y, s.hue);
+      }
+
+      function drawDot(x, y, size, color, alpha, blur = 0) {
+        ctx.globalAlpha = alpha;
+        ctx.fillStyle = color;
+        ctx.shadowColor = color;
+        ctx.shadowBlur = blur * runtime.state.quality;
+        ctx.beginPath();
+        ctx.arc(x, y, size, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      runtime.requestEffectFrame((now) => {
+        const elapsed = now - startedAt;
+        const phase = getPhase(elapsed);
+
+        if (now >= nextLaunchTime && elapsed < duration * 0.92) {
+          launchShell();
+          if (phase === 'finale') {
+            if (runtime.chance(0.9)) launchShell();
+            if (runtime.chance(0.65)) launchShell();
+            if (runtime.chance(0.35)) launchShell();
+          }
+          nextLaunchTime = now + getLaunchInterval(phase);
+        }
+
+        ctx.clearRect(0, 0, W(), H());
+
+        for (let i = flashes.length - 1; i >= 0; i--) {
+          const f = flashes[i];
+          f.life++;
+          drawDot(W() / 2, H() / 2, Math.max(W(), H()), f.color, f.alpha * (1 - f.life / f.maxLife), 0);
+          if (f.life >= f.maxLife) flashes.splice(i, 1);
+        }
+
+        for (let i = shells.length - 1; i >= 0; i--) {
+          const s = shells[i];
+          const p = Math.min((now - s.startTime) / s.riseDuration, 1);
+          const eased = 1 - (1 - p) * (1 - p);
+          s.x = s.startX + Math.sin(s.wobble + (now - s.startTime) * 0.008) * 3;
+          s.y = s.startY + (s.targetY - s.startY) * eased;
+          drawDot(s.x, s.y, 3, s.color, 1, 12);
+          s.trailTimer++;
+          if (s.trailTimer % 2 === 0 && runtime.chance(0.9)) ghosts.push({ x: s.x, y: s.y + 2, size: 2, color: s.color, life: 0, maxLife: 24 });
+          if (p >= 1) {
+            burstShell(s);
+            shells.splice(i, 1);
+          }
+        }
+
+        for (let i = subShells.length - 1; i >= 0; i--) {
+          const ss = subShells[i];
+          ss.x += ss.vx; ss.y += ss.vy; ss.vy += 0.03; ss.vx *= 0.98; ss.vy *= 0.98;
+          drawDot(ss.x, ss.y, 4, ss.color, 0.9, 9);
+          if (now >= ss.burstTime) {
+            miniBurst(ss.x, ss.y, ss.hue);
+            subShells.splice(i, 1);
+          }
+        }
+
+        for (let i = particles.length - 1; i >= 0; i--) {
+          const p = particles[i];
+          p.vx *= p.friction; p.vy *= p.friction; p.vy += p.gravity;
+          p.x += p.vx; p.y += p.vy; p.life++;
+          if (p.colorShift && p.life === p.colorShiftAt) {
+            p.hue = (p.hue + 60) % 360;
+            p.color = hsl(p.hue, 80, 55);
+          }
+          const alpha = Math.max(0, 1 - p.life / p.maxLife);
+          drawDot(p.x, p.y, p.size, p.color, alpha, p.size + 2);
+          if (p.life % Math.round(p.trailInterval / Math.max(0.6, runtime.state.quality)) === 0 && alpha > 0.3 && runtime.chance(0.8)) {
+            ghosts.push({ x: p.x, y: p.y, size: Math.max(1, p.size * 0.6), color: p.color, life: 0, maxLife: 22 });
+          }
+          if (p.life >= p.maxLife) particles.splice(i, 1);
+        }
+
+        for (let i = ghosts.length - 1; i >= 0; i--) {
+          const g = ghosts[i];
+          g.life++;
+          drawDot(g.x, g.y, g.size, g.color, 0.45 * (1 - g.life / g.maxLife), 4);
+          if (g.life >= g.maxLife) ghosts.splice(i, 1);
+        }
+
+        ctx.shadowBlur = 0;
+        ctx.globalAlpha = 1;
+
+        if (elapsed >= duration && shells.length === 0 && particles.length === 0 && subShells.length === 0) {
+          runtime.stop();
+          document.getElementById('fx').style.transition = 'opacity 800ms ease-out';
+          document.getElementById('fx').style.opacity = '0';
+          setTimeout(() => window.close(), 900);
+        }
+      });
     }
-
-    // ---- IPC Handler ----
-    ipcRenderer.on('show-fireworks', (event, opts) => {
-      const duration = (opts && opts.duration) || 12000;
-      startShow(duration);
-    });
   </script>
 </body>
 </html>

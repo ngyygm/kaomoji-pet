@@ -8,6 +8,13 @@
   "entry": "index.html",
   "startChannel": "show-invaders",
   "duration": 22000,
+  "performance": {
+    "renderer": "canvas",
+    "adaptiveQuality": true,
+    "maxParticles": 420,
+    "targetFps": 60,
+    "minQuality": 0.58
+  },
   "window": {
     "type": "fullscreen-transparent",
     "clickThrough": true,

@@ -8,6 +8,13 @@
   "entry": "index.html",
   "startChannel": "show-tornado",
   "duration": 14000,
+  "performance": {
+    "renderer": "hybrid",
+    "adaptiveQuality": true,
+    "maxParticles": 260,
+    "targetFps": 60,
+    "minQuality": 0.48
+  },
   "window": {
     "type": "fullscreen-transparent",
     "clickThrough": true,

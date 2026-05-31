@@ -112,6 +112,7 @@
 </head>
 <body>
   <div id="parade-container"></div>
+  <script src="../_shared/effect-runtime.js"></script>
   <script>
     const { ipcRenderer } = require('electron');
 
@@ -159,6 +160,12 @@
     });
 
     function startParade(duration) {
+      const runtime = EffectRuntime.createRuntime({
+        id: 'parade',
+        adaptiveQuality: true,
+        minQuality: 0.55,
+        targetFps: 60
+      });
       const container = document.getElementById('parade-container');
       const screenWidth = window.innerWidth;
       const screenHeight = window.innerHeight;
@@ -372,6 +379,31 @@
       let animDone = false;
       let dustTimer = 0;
       let noteTimer = 0;
+      const fxPools = new Map();
+
+      function acquireFxEl(className) {
+        const pool = fxPools.get(className) || [];
+        fxPools.set(className, pool);
+        const el = pool.pop() || document.createElement('div');
+        el.className = '';
+        el.removeAttribute('style');
+        el.style.display = 'block';
+        container.appendChild(el);
+        void el.offsetWidth;
+        el.className = className;
+        return el;
+      }
+
+      function releaseFxEl(className, el) {
+        if (!el || !el.parentNode) return;
+        el.style.display = 'none';
+        el.textContent = '';
+        el.className = '';
+        const pool = fxPools.get(className) || [];
+        fxPools.set(className, pool);
+        if (pool.length < 80) pool.push(el);
+        else el.remove();
+      }
 
       // Find references to special marchers (now multiple of each)
       const stragglers = marchers.filter(m => m.role === ROLE_STRAGGLER);
@@ -384,8 +416,8 @@
       });
 
       function spawnDust(x, y, color) {
-        const dust = document.createElement('div');
-        dust.className = 'dust-particle';
+        if (!runtime.chance(0.85)) return;
+        const dust = acquireFxEl('dust-particle');
         const size = 3 + Math.random() * 3;
         dust.style.width = size + 'px';
         dust.style.height = size + 'px';
@@ -393,13 +425,12 @@
         dust.style.top = (y - size / 2) + 'px';
         dust.style.background = color;
         dust.style.opacity = '0.4';
-        container.appendChild(dust);
-        setTimeout(() => dust.remove(), 500);
+        setTimeout(() => releaseFxEl('dust-particle', dust), 520);
       }
 
       function spawnMusicNote(x, y, color) {
-        const note = document.createElement('div');
-        note.className = 'music-note';
+        if (!runtime.chance(0.8)) return;
+        const note = acquireFxEl('music-note');
         const notes = ['♪', '♫', '♬'];
         note.textContent = notes[Math.floor(Math.random() * notes.length)];
         note.style.left = x + 'px';
@@ -407,28 +438,23 @@
         note.style.color = color;
         note.style.textShadow = `0 0 8px ${color}`;
         note.style.setProperty('--note-tx', (Math.random() * 20 - 10) + 'px');
-        container.appendChild(note);
-        setTimeout(() => note.remove(), 1200);
+        setTimeout(() => releaseFxEl('music-note', note), 1220);
       }
 
       function spawnPanicMark(x, y) {
-        const mark = document.createElement('div');
-        mark.className = 'panic-mark';
+        const mark = acquireFxEl('panic-mark');
         mark.textContent = '!!!';
         mark.style.left = x + 'px';
         mark.style.top = y + 'px';
-        container.appendChild(mark);
-        setTimeout(() => mark.remove(), 600);
+        setTimeout(() => releaseFxEl('panic-mark', mark), 620);
       }
 
       function spawnBumpExclaim(x, y) {
-        const ex = document.createElement('div');
-        ex.className = 'bump-exclaim';
+        const ex = acquireFxEl('bump-exclaim');
         ex.textContent = '!';
         ex.style.left = x + 'px';
         ex.style.top = y + 'px';
-        container.appendChild(ex);
-        setTimeout(() => ex.remove(), 500);
+        setTimeout(() => releaseFxEl('bump-exclaim', ex), 520);
       }
 
       function getMarcherPosition(marcher, baseX, progress, time) {
@@ -543,16 +569,15 @@
           }
         });
 
-        if (progress < 1 && !animDone) {
-          requestAnimationFrame(animate);
-        } else {
+        if (progress >= 1 && !animDone) {
+          runtime.stop();
           animDone = true;
           container.classList.add('fade-out');
           setTimeout(() => window.close(), 500);
         }
       }
 
-      requestAnimationFrame(animate);
+      runtime.requestEffectFrame(animate);
     }
   </script>
 </body>

@@ -20,17 +20,17 @@
 </head>
 <body>
   <canvas id="game"></canvas>
+  <script src="../_shared/effect-runtime.js"></script>
   <script>
     const { ipcRenderer } = require('electron');
 
     ipcRenderer.on('show-invaders', (event, { duration }) => {
       const DURATION = duration || (30000 + Math.random() * 10000);
+      const runtime = EffectRuntime.createRuntime({ id: 'invaders', adaptiveQuality: true, minQuality: 0.58, targetFps: 60 });
       const canvas = document.getElementById('game');
-      const ctx = canvas.getContext('2d');
+      const { ctx } = EffectRuntime.createHiDpiCanvas(canvas);
       const W = window.innerWidth;
       const H = window.innerHeight;
-      canvas.width = W;
-      canvas.height = H;
 
       // Kaomoji pools per row tier
       const ALIEN_POOLS = [
@@ -78,6 +78,7 @@
       let fadingOut = false;
       let victorySparkles = [];
       let totalKilled = 0;
+      const aliveScratch = [];
 
       // Uniform drop speed: aliens cross the full screen height in DURATION
       // dropSpeedPerMs = H pixels / DURATION ms (time-based, frame-rate independent)
@@ -112,7 +113,11 @@
       }
 
       function aliveAliens() {
-        return aliens.filter(a => a.alive);
+        aliveScratch.length = 0;
+        for (const a of aliens) {
+          if (a.alive) aliveScratch.push(a);
+        }
+        return aliveScratch;
       }
 
       function getAlienScreenX(a) {
@@ -124,7 +129,7 @@
 
       function spawnHitParticles(x, y, color) {
         const symbols = ['★', '✧', '*', '✦', '✪', '✶', '💥', '✺'];
-        for (let i = 0; i < 14; i++) {
+        for (let i = 0; i < runtime.scaleCount(14, 8); i++) {
           const angle = Math.random() * Math.PI * 2;
           const speed = 2.5 + Math.random() * 7;
           particles.push({
@@ -264,7 +269,7 @@
             fadeAlpha -= 0.02;
             if (fadeAlpha <= 0) {
               fadeAlpha = 0;
-              cancelAnimationFrame(animId);
+              runtime.stop();
               window.close();
               return;
             }
@@ -275,23 +280,23 @@
             p.y += p.vy;
             p.life -= p.decay;
           }
-          particles = particles.filter(p => p.life > 0);
+          for (let i = particles.length - 1; i >= 0; i--) if (particles[i].life <= 0) particles.splice(i, 1);
           for (let f of flashes) {
             f.radius += 3;
             f.alpha -= 0.08;
           }
-          flashes = flashes.filter(f => f.alpha > 0);
+          for (let i = flashes.length - 1; i >= 0; i--) if (flashes[i].alpha <= 0) flashes.splice(i, 1);
           for (let w of shockwaves) {
             w.radius += 8;
             w.alpha -= 0.04;
           }
-          shockwaves = shockwaves.filter(w => w.alpha > 0);
+          for (let i = shockwaves.length - 1; i >= 0; i--) if (shockwaves[i].alpha <= 0) shockwaves.splice(i, 1);
           for (let s of victorySparkles) {
             s.x += s.vx;
             s.y += s.vy;
             s.life -= s.decay;
           }
-          victorySparkles = victorySparkles.filter(s => s.life > 0);
+          for (let i = victorySparkles.length - 1; i >= 0; i--) if (victorySparkles[i].life <= 0) victorySparkles.splice(i, 1);
           return;
         }
 
@@ -358,7 +363,7 @@
           b.y -= b.speed;
           if (b.y < -20) b.active = false;
         }
-        bullets = bullets.filter(b => b.active);
+        for (let i = bullets.length - 1; i >= 0; i--) if (!bullets[i].active) bullets.splice(i, 1);
 
         for (let eb of enemyBullets) {
           if (!eb.active) continue;
@@ -372,13 +377,13 @@
             defender.x += (Math.random() - 0.5) * 60;
           }
         }
-        enemyBullets = enemyBullets.filter(b => b.active);
+        for (let i = enemyBullets.length - 1; i >= 0; i--) if (!enemyBullets[i].active) enemyBullets.splice(i, 1);
 
         // Check collisions
         checkCollisions();
 
         // Clean up dead aliens that finished their hit animation
-        aliens = aliens.filter(a => a.alive || a.hitAnim > 0);
+        for (let i = aliens.length - 1; i >= 0; i--) if (!aliens[i].alive && aliens[i].hitAnim <= 0) aliens.splice(i, 1);
 
         // Update particles
         for (let p of particles) {
@@ -386,20 +391,20 @@
           p.y += p.vy;
           p.life -= p.decay;
         }
-        particles = particles.filter(p => p.life > 0);
+        for (let i = particles.length - 1; i >= 0; i--) if (particles[i].life <= 0) particles.splice(i, 1);
 
         // Update flashes
         for (let f of flashes) {
           f.radius += 3;
           f.alpha -= 0.08;
         }
-        flashes = flashes.filter(f => f.alpha > 0);
+        for (let i = flashes.length - 1; i >= 0; i--) if (flashes[i].alpha <= 0) flashes.splice(i, 1);
 
         for (let w of shockwaves) {
           w.radius += 8;
           w.alpha -= 0.04;
         }
-        shockwaves = shockwaves.filter(w => w.alpha > 0);
+        for (let i = shockwaves.length - 1; i >= 0; i--) if (shockwaves[i].alpha <= 0) shockwaves.splice(i, 1);
 
         // Update victory sparkles
         for (let s of victorySparkles) {
@@ -407,7 +412,7 @@
           s.y += s.vy;
           s.life -= s.decay;
         }
-        victorySparkles = victorySparkles.filter(s => s.life > 0);
+        for (let i = victorySparkles.length - 1; i >= 0; i--) if (victorySparkles[i].life <= 0) victorySparkles.splice(i, 1);
       }
 
       function draw(now) {
@@ -567,11 +572,11 @@
         update(now);
         draw(now);
         if (fadeAlpha > 0) {
-          animId = requestAnimationFrame(gameLoop);
+          return;
         }
       }
 
-      animId = requestAnimationFrame(gameLoop);
+      runtime.requestEffectFrame(gameLoop);
     });
   </script>
 </body>

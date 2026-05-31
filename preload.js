@@ -18,6 +18,7 @@ contextBridge.exposeInMainWorld('petAPI', {
   onSystemMetrics: (callback) => ipcRenderer.on('system-metrics', (event, data) => callback(data)),
   onWalkDone: (callback) => ipcRenderer.on('walk-done', () => callback()),
   prankGiant: (kaomoji, duration) => ipcRenderer.send('prank-giant', { kaomoji, duration }),
+  getGpuStatus: () => ipcRenderer.invoke('gpu:status'),
   listBigEffects: () => ipcRenderer.invoke('big-effects:list'),
   runBigEffect: (id, params) => ipcRenderer.invoke('big-effects:run', { id, params }),
   showRenameDialog: (currentName) => ipcRenderer.invoke('show-rename-dialog', currentName)

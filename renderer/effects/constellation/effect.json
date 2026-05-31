@@ -7,6 +7,13 @@
   "description": "颜文字星点自动连成星座图案。",
   "entry": "index.html",
   "duration": 13000,
+  "performance": {
+    "renderer": "canvas",
+    "adaptiveQuality": true,
+    "maxParticles": 36,
+    "targetFps": 60,
+    "minQuality": 0.7
+  },
   "window": {
     "type": "fullscreen-transparent",
     "clickThrough": true,

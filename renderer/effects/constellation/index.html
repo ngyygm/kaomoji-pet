@@ -1,12 +1,13 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head><meta charset="UTF-8"><title> </title><style>*{margin:0;padding:0;user-select:none}html,body{width:100%;height:100%;overflow:hidden;background:transparent}canvas{display:block;width:100%;height:100%}</style></head>
-<body><canvas id="fx"></canvas><script>
+<body><canvas id="fx"></canvas><script src="../_shared/effect-runtime.js"></script><script>
 const { ipcRenderer } = require('electron');
 ipcRenderer.on('effect:start', (event, payload) => start(payload?.duration || 13000));
 function start(duration) {
-  const canvas = document.getElementById('fx'), ctx = canvas.getContext('2d');
-  const W = canvas.width = window.innerWidth, H = canvas.height = window.innerHeight;
+  const runtime = EffectRuntime.createRuntime({ id: 'constellation', adaptiveQuality: true, minQuality: 0.7, targetFps: 60 });
+  const canvas = document.getElementById('fx'), { ctx } = EffectRuntime.createHiDpiCanvas(canvas);
+  const W = window.innerWidth, H = window.innerHeight;
   const faces = ['(=^・ω・^=)','(✧◡✧)','(・ω<)☆','(｡◕‿◕｡)','(๑>◡<๑)','(ღ˘︶˘ღ)','(ꈍᴗꈍ)','(★^O^★)'];
   const colors = ['#fde68a','#93c5fd','#f9a8d4','#86efac','#c084fc'];
   const pick = a => a[Math.floor(Math.random()*a.length)];
@@ -34,8 +35,8 @@ function start(duration) {
       ctx.fillText(p.text, p.x-28, p.y+8);
     }
     ctx.globalAlpha = fade * Math.min(1, progress*2); ctx.font='34px "Microsoft YaHei", sans-serif'; ctx.fillStyle='#fff'; ctx.shadowBlur=20; ctx.fillText('今日星图已生成', W/2-125, H*0.88);
-    if (elapsed < duration) requestAnimationFrame(loop); else window.close();
+    if (elapsed >= duration) { runtime.stop(); window.close(); }
   }
-  requestAnimationFrame(loop);
+  runtime.requestEffectFrame(loop);
 }
 </script></body></html>
