@@ -5,4 +5,8 @@ mshta vbscript:CreateObject("WScript.Shell").Run("cmd /c ""%~f0"" run",0,False)(
 exit
 :run
 taskkill /F /IM electron.exe >nul 2>&1
+if not exist "node_modules" (
+  echo [kaomoji-pet] 首次运行，正在安装依赖...
+  npm install >nul 2>&1
+)
 npx electron .
