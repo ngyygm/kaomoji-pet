@@ -6,11 +6,13 @@ if exist "node_modules" goto :launch
 echo ============================================
 echo   kaomoji-pet - First run, installing...
 echo ============================================
-call npm install
+set ELECTRON_MIRROR=https://npmmirror.com/mirrors/electron/
+call npm install --loglevel=error --registry=https://registry.npmmirror.com
 if errorlevel 1 (
     echo.
-    echo Install failed! Please install Node.js first:
-    echo https://nodejs.org
+    echo Install failed! Possible reasons:
+    echo   1. Node.js not installed: https://nodejs.org
+    echo   2. Network issue, try again later
     pause
     exit /b 1
 )
