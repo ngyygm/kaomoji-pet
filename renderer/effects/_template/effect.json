@@ -1,0 +1,24 @@
+{
+  "id": "my-effect",
+  "name": "我的大特效",
+  "emoji": "✨",
+  "version": "1.0.0",
+  "description": "复制这个文件夹并修改 effect.json 与 index.html。",
+  "entry": "index.html",
+  "duration": 5000,
+  "window": {
+    "type": "fullscreen-transparent",
+    "clickThrough": true,
+    "focusable": false,
+    "alwaysOnTop": true
+  },
+  "pet": {
+    "animation": "happy",
+    "animationDuration": 3000,
+    "particles": null
+  },
+  "params": {
+    "duration": { "type": "number", "default": 5000 }
+  },
+  "enabled": true
+}

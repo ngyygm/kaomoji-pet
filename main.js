@@ -1,5 +1,6 @@
-const { app, BrowserWindow, ipcMain, screen, powerMonitor } = require('electron');
+const { app, BrowserWindow, ipcMain, screen, powerMonitor, Menu } = require('electron');
 const path = require('path');
+const fs = require('fs');
 const os = require('os');
 const { execSync } = require('child_process');
 
@@ -10,19 +11,171 @@ let lastPrankTime = 0;
 let systemMonitorTimer = null;
 let isCharging = true;
 let cpuSamples = [];
+const activeEffectWindows = new Map();
+
+function configureChromelessWindow(win) {
+  if (typeof win.setAutoHideMenuBar === 'function') win.setAutoHideMenuBar(true);
+  win.setMenuBarVisibility(false);
+  if (typeof win.setMenu === 'function') win.setMenu(null);
+}
+
+const effectsDir = path.join(__dirname, 'renderer', 'effects');
+
+function readJsonFile(filePath) {
+  return JSON.parse(fs.readFileSync(filePath, 'utf-8'));
+}
+
+function getDefaultParams(effect) {
+  const defaults = {};
+  const schema = effect.params || {};
+  for (const [key, def] of Object.entries(schema)) {
+    if (def && Object.prototype.hasOwnProperty.call(def, 'default')) {
+      defaults[key] = def.default;
+    }
+  }
+  return { ...defaults, ...(effect.defaultParams || {}) };
+}
+
+function loadBigEffects() {
+  if (!fs.existsSync(effectsDir)) return [];
+
+  return fs.readdirSync(effectsDir, { withFileTypes: true })
+    .filter(entry => entry.isDirectory() && !entry.name.startsWith('_'))
+    .map(entry => {
+      const dir = path.join(effectsDir, entry.name);
+      const manifestPath = path.join(dir, 'effect.json');
+      if (!fs.existsSync(manifestPath)) return null;
+
+      try {
+        const manifest = readJsonFile(manifestPath);
+        if (!manifest || manifest.enabled === false) return null;
+
+        const entryFile = manifest.entry || 'index.html';
+        const entryPath = path.join(dir, entryFile);
+        if (!fs.existsSync(entryPath)) return null;
+
+        return {
+          ...manifest,
+          id: manifest.id || entry.name,
+          entry: entryFile,
+          dir,
+          entryPath
+        };
+      } catch (err) {
+        console.error(`Failed to load effect manifest: ${manifestPath}`, err);
+        return null;
+      }
+    })
+    .filter(Boolean)
+    .sort((a, b) => (a.order || 0) - (b.order || 0) || a.id.localeCompare(b.id));
+}
+
+function getBigEffectSummaries() {
+  return loadBigEffects().map(effect => ({
+    id: effect.id,
+    name: effect.name || effect.id,
+    emoji: effect.emoji || '✨',
+    version: effect.version || '1.0.0',
+    description: effect.description || '',
+    duration: effect.duration || getDefaultParams(effect).duration || 4000,
+    params: effect.params || {},
+    pet: effect.pet || {},
+    petAnimation: effect.pet?.animation || effect.petAnimation || null,
+    petAnimDuration: effect.pet?.animationDuration || effect.petAnimDuration || 3000,
+    petParticles: effect.pet?.particles || effect.petParticles || null
+  }));
+}
+
+function createEffectWindow(effect, resolvedParams) {
+  const { width, height } = screen.getPrimaryDisplay().workAreaSize;
+  const winConfig = effect.window || {};
+  const effectWin = new BrowserWindow({
+    title: ' ',
+    width,
+    height,
+    x: 0,
+    y: 0,
+    transparent: true,
+    frame: false,
+    titleBarStyle: 'hidden',
+    alwaysOnTop: winConfig.alwaysOnTop !== false,
+    resizable: false,
+    focusable: winConfig.focusable === true,
+    skipTaskbar: true,
+    autoHideMenuBar: true,
+    hasShadow: false,
+    backgroundColor: '#00000000',
+    webPreferences: {
+      nodeIntegration: true,
+      contextIsolation: false
+    }
+  });
+
+  configureChromelessWindow(effectWin);
+  if (winConfig.clickThrough !== false) effectWin.setIgnoreMouseEvents(true);
+
+  effectWin.loadFile(effect.entryPath);
+  effectWin.webContents.on('did-finish-load', () => {
+    const payload = {
+      id: effect.id,
+      duration: resolvedParams.duration,
+      params: resolvedParams
+    };
+    effectWin.webContents.send('effect:start', payload);
+    if (effect.startChannel) {
+      effectWin.webContents.send(effect.startChannel, resolvedParams);
+    }
+  });
+
+  effectWin.on('closed', () => {
+    if (activeEffectWindows.get(effect.id) === effectWin) {
+      activeEffectWindows.delete(effect.id);
+    }
+  });
+
+  return effectWin;
+}
+
+function runBigEffect(effectId, params = {}) {
+  const effect = loadBigEffects().find(item => item.id === effectId);
+  if (!effect) return { success: false, error: `Unknown big effect: ${effectId}` };
+
+  const defaults = getDefaultParams(effect);
+  const resolvedParams = {
+    ...defaults,
+    ...(params || {})
+  };
+  resolvedParams.duration = Number(resolvedParams.duration || effect.duration || 4000);
+
+  const existing = activeEffectWindows.get(effect.id);
+  if (existing && !existing.isDestroyed()) existing.close();
+
+  const win = createEffectWindow(effect, resolvedParams);
+  activeEffectWindows.set(effect.id, win);
+
+  const closeAfter = Number(effect.closeAfterMs || (resolvedParams.duration + (effect.closeBufferMs ?? 3000)));
+  setTimeout(() => {
+    if (!win.isDestroyed()) win.close();
+  }, closeAfter);
+
+  return { success: true };
+}
 
 function createMainWindow() {
   const { width: screenWidth, height: screenHeight } = screen.getPrimaryDisplay().workAreaSize;
 
   mainWindow = new BrowserWindow({
-    width: 260,
+    title: ' ',
+    width: 350,
     height: 260,
-    x: screenWidth - 280,
+    x: screenWidth - 370,
     y: screenHeight - 310,
     transparent: true,
     frame: false,
+    titleBarStyle: 'hidden',
     alwaysOnTop: true,
     skipTaskbar: true,
+    autoHideMenuBar: true,
     resizable: false,
     hasShadow: false,
     backgroundColor: '#00000000',
@@ -36,6 +189,7 @@ function createMainWindow() {
     }
   });
 
+  configureChromelessWindow(mainWindow);
   mainWindow.loadFile(path.join(__dirname, 'renderer', 'index.html'));
   mainWindow.setVisibleOnAllWorkspaces(true);
 
@@ -317,7 +471,9 @@ ipcMain.handle('get-window-size', () => {
 });
 
 ipcMain.on('resize-window', (event, { width, height }) => {
-  // Window size is fixed; this handler is kept for compatibility
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.setSize(Math.round(width), Math.round(height));
+  }
 });
 
 ipcMain.on('set-ignore-mouse', (event, { ignore, options }) => {
@@ -335,14 +491,17 @@ ipcMain.handle('show-rename-dialog', (event, currentName) => {
     const ry = Math.round((sh - rh) / 2);
 
     const renameWin = new BrowserWindow({
+      title: ' ',
       width: rw, height: rh,
       x: rx, y: ry,
       frame: false,
+      titleBarStyle: 'hidden',
       transparent: true,
       resizable: false,
       alwaysOnTop: true,
       skipTaskbar: true,
-      hasShadow: true,
+      autoHideMenuBar: true,
+      hasShadow: false,
       backgroundColor: '#00000000',
       focusable: true,
       show: false,
@@ -352,6 +511,7 @@ ipcMain.handle('show-rename-dialog', (event, currentName) => {
       }
     });
 
+    renameWin.setMenuBarVisibility(false);
     renameWin.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(`
       <style>
         * { margin:0; padding:0; box-sizing:border-box; }
@@ -438,107 +598,34 @@ ipcMain.on('close-app', () => {
   app.quit();
 });
 
-// === Giant kaomoji overlay (merged prank + easter egg) ===
-function showGiantKaomoji(kaomoji, color, duration, mode) {
-  const { width, height } = screen.getPrimaryDisplay().workAreaSize;
+ipcMain.handle('big-effects:list', () => getBigEffectSummaries());
+ipcMain.handle('big-effects:run', (event, { id, params }) => runBigEffect(id, params));
 
-  const prankWin = new BrowserWindow({
-    width,
-    height,
-    x: 0,
-    y: 0,
-    transparent: true,
-    frame: false,
-    alwaysOnTop: true,
-    resizable: false,
-    focusable: false,
-    skipTaskbar: true,
-    hasShadow: false,
-    backgroundColor: '#00000000',
-    webPreferences: {
-      nodeIntegration: true,
-      contextIsolation: false
-    }
-  });
-
-  prankWin.setIgnoreMouseEvents(true);
-  prankWin.loadFile(path.join(__dirname, 'renderer', 'prank-giant.html'));
-
-  prankWin.webContents.on('did-finish-load', () => {
-    prankWin.webContents.send('show-giant', {
-      kaomoji: kaomoji || null,
-      color: color || null,
-      mode: mode || null
-    });
-  });
-
-  const d = duration || 3500;
-  setTimeout(() => {
-    if (!prankWin.isDestroyed()) prankWin.close();
-  }, d);
-}
-
-// Auto-triggered by easter egg system (with cooldown)
+// Compatibility bridges for older renderer actions.
 ipcMain.on('prank-giant', (event, { kaomoji, duration }) => {
   const now = Date.now();
   if (now - lastPrankTime < 20 * 60 * 1000) return;
   lastPrankTime = now;
-  showGiantKaomoji(kaomoji, null, duration || 4000);
+  runBigEffect('giant', { kaomoji: kaomoji || null, duration: duration || 4000 });
 });
 
-// Triggered by user interaction (no cooldown)
 ipcMain.on('easter-egg-giant', (event, { kaomoji, color, duration, mode }) => {
-  showGiantKaomoji(kaomoji, color, duration || 3500, mode);
+  const effectId = mode === 'billiard' ? 'billiard' : 'giant';
+  runBigEffect(effectId, { kaomoji: kaomoji || null, color: color || null, mode: mode || null, duration: duration || 3500 });
 });
-
-// === Care Rain: floating encouragement overlay ===
-let careRainWin = null;
 
 ipcMain.on('care-rain', (event, { messages, duration, opacity }) => {
-  // Close existing care rain window if still open
-  if (careRainWin && !careRainWin.isDestroyed()) {
-    careRainWin.close();
-  }
-
-  const { width, height } = screen.getPrimaryDisplay().workAreaSize;
-
-  careRainWin = new BrowserWindow({
-    width,
-    height,
-    x: 0,
-    y: 0,
-    transparent: true,
-    frame: false,
-    alwaysOnTop: true,
-    resizable: false,
-    focusable: false,
-    skipTaskbar: true,
-    hasShadow: false,
-    backgroundColor: '#00000000',
-    webPreferences: {
-      nodeIntegration: true,
-      contextIsolation: false
-    }
-  });
-
-  careRainWin.setIgnoreMouseEvents(true);
-  careRainWin.loadFile(path.join(__dirname, 'renderer', 'care-rain.html'));
-
-  careRainWin.webContents.on('did-finish-load', () => {
-    careRainWin.webContents.send('show-care-rain', {
-      messages: messages || ['记得休息一下。', '慢慢来。', '我在陪着你。'],
-      duration: duration || 8000,
-      opacity: opacity || 0.7
-    });
-  });
-
-  // Safety timeout: close after 25s even if self-close fails
-  setTimeout(() => {
-    if (careRainWin && !careRainWin.isDestroyed()) careRainWin.close();
-  }, 25000);
+  runBigEffect('care-rain', { messages, duration: duration || 8000, opacity: opacity || 0.7 });
 });
 
+ipcMain.on('parade', (event, { duration }) => runBigEffect('parade', { duration }));
+ipcMain.on('invaders', (event, { duration }) => runBigEffect('invaders', { duration }));
+ipcMain.on('bullet-waltz', (event, { duration }) => runBigEffect('bullet-waltz', { duration }));
+ipcMain.on('tornado', (event, { duration }) => runBigEffect('tornado', { duration }));
+ipcMain.on('fireworks', (event, { duration }) => runBigEffect('fireworks', { duration }));
+
 app.whenReady().then(() => {
+  Menu.setApplicationMenu(null);
   createMainWindow();
   startSystemMonitor();
 });

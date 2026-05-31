@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <title> </title>
+  <style>
+    * { margin: 0; padding: 0; user-select: none; }
+    html, body { width: 100%; height: 100%; overflow: hidden; background: transparent; }
+    canvas { display: block; width: 100%; height: 100%; }
+  </style>
+</head>
+<body>
+  <canvas id="fx"></canvas>
+  <script>
+    const { ipcRenderer } = require('electron');
+    ipcRenderer.on('effect:start', (event, payload) => start(payload?.duration || 13000));
+
+    function start(duration) {
+      const canvas = document.getElementById('fx');
+      const ctx = canvas.getContext('2d');
+      const W = canvas.width = window.innerWidth;
+      const H = canvas.height = window.innerHeight;
+      const wishes = ['今晚也会顺利', '小小幸运降落', '保持发光', '慢慢来', '被温柔接住', '灵感出现'];
+      const faces = ['(｡◕‿◕｡)', '(=^・ω・^=)', '(๑>◡<๑)', '(ღ˘︶˘ღ)', '(✧◡✧)'];
+      const colors = ['#fde68a', '#f9a8d4', '#93c5fd', '#86efac', '#c084fc', '#67e8f9'];
+      const stars = Array.from({ length: 90 }, () => ({ x: Math.random() * W, y: Math.random() * H * 0.75, s: Math.random() * 2 + 0.5, a: Math.random() }));
+      let meteors = [], sparkles = [], last = performance.now(), startTime = last, spawn = 0;
+      const pick = arr => arr[Math.floor(Math.random() * arr.length)];
+
+      function addMeteor() {
+        const y = Math.random() * H * 0.45 + 20;
+        const color = pick(colors);
+        meteors.push({
+          x: -120 - Math.random() * 200, y,
+          vx: 8 + Math.random() * 8, vy: 3 + Math.random() * 4,
+          life: 1, color, text: Math.random() < 0.35 ? pick(wishes) : pick(faces),
+          size: 20 + Math.random() * 16, trail: []
+        });
+      }
+
+      function loop(now) {
+        const dt = Math.min(32, now - last); last = now;
+        const elapsed = now - startTime;
+        ctx.clearRect(0, 0, W, H);
+        ctx.globalAlpha = Math.max(0, Math.min(1, (duration - elapsed) / 700));
+
+        for (const s of stars) {
+          s.a += 0.03;
+          ctx.globalAlpha = (0.25 + Math.sin(s.a) * 0.2) * Math.max(0, Math.min(1, (duration - elapsed) / 700));
+          ctx.fillStyle = '#fff7ed';
+          ctx.beginPath(); ctx.arc(s.x, s.y, s.s, 0, Math.PI * 2); ctx.fill();
+        }
+
+        spawn += dt;
+        if (spawn > 150) { spawn = 0; addMeteor(); if (Math.random() < 0.45) addMeteor(); }
+
+        for (const m of meteors) {
+          m.trail.push({ x: m.x, y: m.y });
+          if (m.trail.length > 18) m.trail.shift();
+          m.x += m.vx; m.y += m.vy; m.vy += 0.015; m.life -= 0.003;
+          for (let i = 0; i < m.trail.length; i++) {
+            const p = m.trail[i];
+            ctx.globalAlpha = (i / m.trail.length) * 0.45;
+            ctx.fillStyle = m.color;
+            ctx.beginPath(); ctx.arc(p.x, p.y, 2 + i * 0.35, 0, Math.PI * 2); ctx.fill();
+          }
+          ctx.globalAlpha = Math.max(0, m.life);
+          ctx.font = `${m.size}px "Segoe UI Emoji", "Microsoft YaHei", sans-serif`;
+          ctx.fillStyle = m.color; ctx.shadowColor = m.color; ctx.shadowBlur = 18;
+          ctx.fillText(m.text, m.x, m.y);
+          if (Math.random() < 0.12) sparkles.push({ x: m.x, y: m.y, vx: (Math.random() - 0.5) * 2, vy: -Math.random() * 2, life: 1, color: m.color });
+        }
+        meteors = meteors.filter(m => m.life > 0 && m.x < W + 260 && m.y < H + 100);
+        ctx.shadowBlur = 0;
+
+        for (const p of sparkles) {
+          p.x += p.vx; p.y += p.vy; p.life -= 0.025;
+          ctx.globalAlpha = p.life; ctx.fillStyle = p.color; ctx.fillText('✦', p.x, p.y);
+        }
+        sparkles = sparkles.filter(p => p.life > 0);
+
+        ctx.globalAlpha = Math.max(0, Math.min(1, (duration - elapsed) / 900));
+        ctx.font = '34px "Segoe UI Emoji", sans-serif';
+        ctx.fillStyle = '#fde68a'; ctx.shadowColor = '#fde68a'; ctx.shadowBlur = 24;
+        ctx.fillText('(=^・ω・^=)', W / 2 - 85, H - 78 + Math.sin(now * 0.004) * 6);
+
+        if (elapsed < duration) requestAnimationFrame(loop);
+        else window.close();
+      }
+      requestAnimationFrame(loop);
+    }
+  </script>
+</body>
+</html>

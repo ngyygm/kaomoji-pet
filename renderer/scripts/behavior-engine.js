@@ -34,20 +34,15 @@ class BehaviorEngine {
   }
 
   _triggerRandomFx() {
-    const effects = ['billiard', 'giant', 'giant', 'rain'];
-    const pick = effects[Math.floor(Math.random() * effects.length)];
-    if (pick === 'billiard') {
-      window.petAPI.triggerBilliard(9000);
-      this.renderer.setAnimationOverride('surprised', 3000);
-    } else if (pick === 'giant') {
-      window.petAPI.easterEggGiant(null, null, 4000);
-      this.renderer.setAnimationOverride('surprised', 3000);
-    } else if (pick === 'rain') {
-      window.petAPI.triggerCareRain(
-        typeof CARE_MESSAGES !== 'undefined' ? CARE_MESSAGES : ['休息一下。', '我在陪着你。'],
-        10000, 0.75
-      );
-      this.renderer.spawnParticles('heart', 5);
+    // Auto-discover all effects from registry
+    if (typeof BIG_EFFECTS === 'undefined' || !BIG_EFFECTS.length) return;
+    const effect = BIG_EFFECTS[Math.floor(Math.random() * BIG_EFFECTS.length)];
+    window.petAPI.runBigEffect(effect.id);
+    if (effect.petAnimation) {
+      this.renderer.setAnimationOverride(effect.petAnimation, effect.petAnimDuration || 3000);
+    }
+    if (effect.petParticles) {
+      this.renderer.spawnParticles(effect.petParticles[0], effect.petParticles[1]);
     }
   }
 
@@ -333,16 +328,16 @@ class BehaviorEngine {
         this.renderer.setAnimationOverride('surprised', 3000);
         break;
       case 'giant_face':
-        window.petAPI.prankGiant(null, 4000);
+        window.petAPI.runBigEffect('giant', { duration: 4000 });
         break;
       case 'care_rain':
         this._showBubble(pickRandomSpeech('stressed_concern'), 4000);
         this.renderer.spawnParticles('heart', 5);
-        window.petAPI.triggerCareRain(
-          ['今天也辛苦啦。', '慢慢来。', '记得休息。', 'You are doing great.', 'おつかれさま。', '我在陪着你。'],
-          8000,
-          0.65
-        );
+        window.petAPI.runBigEffect('care-rain', {
+          messages: ['今天也辛苦啦。', '慢慢来。', '记得休息。', 'You are doing great.', 'おつかれさま。', '我在陪着你。'],
+          duration: 8000,
+          opacity: 0.65
+        });
         break;
       case 'patrol':
         if (this.screenWalker) this.screenWalker.walkToRandomPosition();
@@ -369,6 +364,7 @@ class BehaviorEngine {
         this._showBubble(pickRandomSpeech('long_companion'), 5000);
         break;
       case 'fireworks':
+        window.petAPI.runBigEffect('fireworks', { duration: 12000 });
         this.renderer.spawnParticles('sparkle', 15);
         this.renderer.spawnParticles('star', 10);
         this._showBubble('新年快乐！', 5000);
@@ -386,10 +382,10 @@ class BehaviorEngine {
 
     // Different effects based on mischief level
     if (state.mischief > 0.4) {
-      // Giant face easter egg — prank-giant.html now picks random kaomoji & color
+      // Giant face effect picks a random kaomoji and uses the requested color.
       const colors = ['#f9a8d4', '#818cf8', '#f87171', '#86efac', '#fde68a', '#c084fc', '#fb923c', '#f472b6', '#a3e635'];
       const color = colors[Math.floor(Math.random() * colors.length)];
-      window.petAPI.easterEggGiant(null, color, 3500);
+      window.petAPI.runBigEffect('giant', { color, duration: 3500 });
       this.renderer.setAnimationOverride('surprised', 3000);
     } else {
       // Mini burst: particles + surprised expression even at low mischief
@@ -406,18 +402,19 @@ class BehaviorEngine {
 
     const effects = [
       () => {
-        // Giant face — random kaomoji & color handled by prank-giant.html
+        // Giant face effect picks a random kaomoji and uses the requested color.
         const colors = ['#f9a8d4', '#818cf8', '#f87171', '#86efac', '#fde68a', '#c084fc', '#fb923c', '#e879f9', '#67e8f9'];
         const color = colors[Math.floor(Math.random() * colors.length)];
-        window.petAPI.easterEggGiant(null, color, 3500);
+        window.petAPI.runBigEffect('giant', { color, duration: 3500 });
         this.renderer.setAnimationOverride('surprised', 3000);
       },
       () => {
         // Care rain
-        window.petAPI.triggerCareRain(
-          typeof CARE_MESSAGES !== 'undefined' ? CARE_MESSAGES : ['记得休息。', 'You are doing great.', 'おつかれさま。'],
-          10000, 0.75
-        );
+        window.petAPI.runBigEffect('care-rain', {
+          messages: typeof CARE_MESSAGES !== 'undefined' ? CARE_MESSAGES : ['记得休息。', 'You are doing great.', 'おつかれさま。'],
+          duration: 10000,
+          opacity: 0.75
+        });
         this.renderer.spawnParticles('heart', 6);
         this.renderer.setAnimationOverride('love', 3000);
         this._showBubble(pickRandomSpeech('stressed_concern'), 4000);

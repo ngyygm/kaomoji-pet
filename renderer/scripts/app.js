@@ -9,11 +9,13 @@ class App {
     this.saveManager = new SaveManager();
     this.clickCounter = 0;
     this.clickTimer = null;
+    this.bigEffects = [];
   }
 
   async init() {
     const { petState, hiddenState, isNew } = await this.saveManager.loadFull();
     this.petState = petState;
+    await this.loadBigEffects();
 
     this.renderer = new PetRenderer();
     this.systemMonitor = new SystemMonitor();
@@ -37,6 +39,12 @@ class App {
     this.renderer.updateKaomoji('happy', 'adult');
     this.renderer.showBubble('喵~ 你好！', 4000);
     this.renderer.spawnParticles('sparkle', 3);
+  }
+
+  async loadBigEffects() {
+    this.bigEffects = await window.petAPI.listBigEffects();
+    BIG_EFFECTS = this.bigEffects;
+    window.BIG_EFFECTS = this.bigEffects;
   }
 
   setupInteractions() {
@@ -80,7 +88,6 @@ class App {
         document.removeEventListener('mouseup', onMouseUp);
 
         if (!isDragging) {
-          // It was a click, not a drag
           this.clickCounter++;
           if (this.clickTimer) clearTimeout(this.clickTimer);
           this.clickTimer = setTimeout(() => {
@@ -106,39 +113,114 @@ class App {
       document.addEventListener('mousemove', onMouseMove);
       document.addEventListener('mouseup', onMouseUp);
     });
-
-    // Close menus on click outside
-    document.addEventListener('click', () => this.hideContextMenu());
   }
 
   setupContextMenu() {
+    const mainMenu = document.getElementById('context-menu');
+    this.renderMainContextMenu();
+
+    // --- Show main menu on right-click ---
     document.addEventListener('contextmenu', (e) => {
       e.preventDefault();
-      const menu = document.getElementById('context-menu');
-      menu.style.left = e.clientX + 'px';
-      menu.style.top = e.clientY + 'px';
-      menu.classList.remove('hidden');
+      this.hideContextMenu();
+      this.renderMainContextMenu();
+      this.positionContextMenu(e.clientX, e.clientY);
+      mainMenu.classList.remove('hidden');
+      this.keepContextMenuInBounds();
     });
 
-    document.querySelectorAll('.ctx-item').forEach(item => {
-      item.addEventListener('click', (e) => {
-        e.stopPropagation();
+    // --- Main menu item clicks ---
+    mainMenu.addEventListener('click', (e) => {
+      const item = e.target.closest('.ctx-item');
+      if (!item) return;
+      e.stopPropagation();
+      const action = item.dataset.ctx;
+
+      if (action === 'big-effects') {
+        this.renderEffectsContextMenu();
+        this.keepContextMenuInBounds();
+      } else if (action === 'effects-back') {
+        this.renderMainContextMenu();
+        this.keepContextMenuInBounds();
+      } else if (action === 'effect-trigger') {
         this.hideContextMenu();
-        const action = item.dataset.ctx;
+        this.triggerSelectedEffect(item.dataset.effectId);
+      } else {
+        this.hideContextMenu();
         if (action === 'rename') this.showNameDialog();
-        else if (action === 'fx-billiard') window.petAPI.triggerBilliard(9000);
-        else if (action === 'fx-rain') window.petAPI.triggerCareRain(
-          typeof CARE_MESSAGES !== 'undefined' ? CARE_MESSAGES : ['休息一下。', '我在陪着你。'],
-          10000, 0.75
-        );
-        else if (action === 'fx-giant') window.petAPI.easterEggGiant(null, null, 4000);
         else if (action === 'save') {
           this.saveManager.saveFull(this.petState, this.hiddenState.getState());
           this.renderer.showToast('存档成功！', 'success');
         }
         else if (action === 'exit') window.petAPI.closeApp();
-      });
+      }
     });
+
+    // --- Click outside closes menu ---
+    document.addEventListener('click', () => this.hideContextMenu());
+  }
+
+  positionContextMenu(x, y) {
+    const menu = document.getElementById('context-menu');
+    menu.style.left = x + 'px';
+    menu.style.top = y + 'px';
+  }
+
+  keepContextMenuInBounds() {
+    const menu = document.getElementById('context-menu');
+    const rect = menu.getBoundingClientRect();
+    const pad = 4;
+    let left = rect.left;
+    let top = rect.top;
+
+    if (rect.right > window.innerWidth - pad) {
+      left = Math.max(pad, window.innerWidth - rect.width - pad);
+    }
+    if (rect.bottom > window.innerHeight - pad) {
+      top = Math.max(pad, window.innerHeight - rect.height - pad);
+    }
+
+    menu.style.left = Math.round(left) + 'px';
+    menu.style.top = Math.round(top) + 'px';
+  }
+
+  renderMainContextMenu() {
+    const menu = document.getElementById('context-menu');
+    menu.innerHTML = `
+      <div class="ctx-item" data-ctx="rename">改名</div>
+      <div class="ctx-separator"></div>
+      <div class="ctx-item" data-ctx="big-effects">✨ 大特效 ▸</div>
+      <div class="ctx-separator"></div>
+      <div class="ctx-item" data-ctx="save">存档</div>
+      <div class="ctx-item ctx-danger" data-ctx="exit">退出</div>
+    `;
+  }
+
+  renderEffectsContextMenu() {
+    const menu = document.getElementById('context-menu');
+    const effects = this.bigEffects;
+    const effectItems = effects.map(effect =>
+      `<div class="ctx-item" data-ctx="effect-trigger" data-effect-id="${effect.id}">${effect.emoji} ${effect.name}</div>`
+    ).join('');
+
+    menu.innerHTML = `
+      <div class="ctx-item ctx-back" data-ctx="effects-back">← 返回</div>
+      <div class="ctx-header">✨ 大特效</div>
+      ${effectItems || '<div class="ctx-item ctx-disabled">暂无特效</div>'}
+    `;
+  }
+
+  triggerSelectedEffect(effectId) {
+    const effect = this.bigEffects.find(e => e.id === effectId);
+    if (!effect) return;
+
+    window.petAPI.runBigEffect(effect.id);
+    if (effect.petAnimation) {
+      this.renderer.setAnimationOverride(effect.petAnimation, effect.petAnimDuration || 3000);
+    }
+    if (effect.petParticles) {
+      this.renderer.spawnParticles(effect.petParticles[0], effect.petParticles[1]);
+    }
   }
 
   setupIPCListeners() {
@@ -165,10 +247,6 @@ class App {
     document.getElementById('context-menu').classList.add('hidden');
   }
 
-  _debugLog(msg) {
-    // debug disabled
-  }
-
   async showNameDialog() {
     const name = await window.petAPI.showRenameDialog(this.petState.name);
     if (name) {
@@ -189,11 +267,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const el = document.elementFromPoint(e.clientX, e.clientY);
     const interactive = el && (
       el.closest('#kaomoji') ||
-      el.closest('#pet-display') ||
-      el.closest('#pet-container') ||
       el.closest('#context-menu') ||
       el.closest('#speech-bubble') ||
-      el.closest('#bottom-section')
+      el.closest('#bottom-section') ||
+      el.closest('#combo-count')
     );
     window.petAPI.setIgnoreMouseEvents(!interactive, { forward: true });
   });

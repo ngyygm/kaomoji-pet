@@ -1,0 +1,26 @@
+{
+  "id": "tornado",
+  "name": "龙卷风",
+  "emoji": "🌪",
+  "order": 70,
+  "version": "1.0.0",
+  "description": "全屏颜文字龙卷风。",
+  "entry": "index.html",
+  "startChannel": "show-tornado",
+  "duration": 14000,
+  "window": {
+    "type": "fullscreen-transparent",
+    "clickThrough": true,
+    "focusable": false,
+    "alwaysOnTop": true
+  },
+  "pet": {
+    "animation": "surprised",
+    "animationDuration": 3000,
+    "particles": null
+  },
+  "params": {
+    "duration": { "type": "number", "default": 14000 }
+  },
+  "enabled": true
+}

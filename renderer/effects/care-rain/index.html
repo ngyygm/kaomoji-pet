@@ -2,6 +2,7 @@
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8">
+  <title> </title>
   <style>
     * { margin: 0; padding: 0; user-select: none; }
     html, body {
@@ -30,11 +31,22 @@
 <body>
   <script>
     const { ipcRenderer } = require('electron');
-    ipcRenderer.on('show-care-rain', (event, { messages, duration, opacity }) => {
+    function startEffect({ messages, duration, opacity }) {
       const peakOpacity = opacity || 0.85;
       const screenH = window.innerHeight;
       const screenW = window.innerWidth;
-      const pool = messages || ['记得休息。'];
+      const defaultMessages = [
+        '记得休息一下。', '喝口水。', '肩膀放松。', '眼睛眨一眨。', '慢慢来。',
+        '你已经做了很多。', '今天也辛苦啦。', '先深呼吸。', '不用一下子完成。', '我在陪着你。',
+        '保存一下进度吧。', '伸个懒腰。', '换个姿势。', '别忘了吃饭。', '屏幕可以离远一点。',
+        '做得很好。', '一步一步来。', '先照顾好自己。', '给自己一点耐心。', '很稳，继续。',
+        '可以停一分钟。', '任务会被慢慢解决。', '你不是一个人在扛。', '把手腕放松。', '晚点也来得及。',
+        '先把呼吸找回来。', '小进展也是进展。', '别太用力。', '今天的你也很认真。', '休息不是偷懒。',
+        'You are doing great.', 'One step at a time.', 'Take a tiny break.', 'Breathe in, breathe out.',
+        'You have time.', 'Progress counts.', 'Be kind to yourself.', 'Water break?', 'Stretch a little.',
+        'おつかれさま。', '少し休もう。', 'だいじょうぶ。', 'ゆっくりでいいよ。'
+      ];
+      const pool = messages && messages.length ? messages : defaultMessages;
 
       const totalCount = 500;
       let removedCount = 0;
@@ -86,7 +98,12 @@
           }, removeDelay);
         }, delay);
       }
+    }
+
+    ipcRenderer.on('effect:start', (event, { params, duration }) => {
+      startEffect({ ...params, duration });
     });
+    ipcRenderer.on('show-care-rain', (event, payload) => startEffect(payload));
   </script>
 </body>
 </html>

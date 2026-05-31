@@ -1,0 +1,578 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <title> </title>
+  <style>
+    * { margin: 0; padding: 0; user-select: none; }
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: transparent;
+    }
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+  </style>
+</head>
+<body>
+  <canvas id="game"></canvas>
+  <script>
+    const { ipcRenderer } = require('electron');
+
+    ipcRenderer.on('show-invaders', (event, { duration }) => {
+      const DURATION = duration || (30000 + Math.random() * 10000);
+      const canvas = document.getElementById('game');
+      const ctx = canvas.getContext('2d');
+      const W = window.innerWidth;
+      const H = window.innerHeight;
+      canvas.width = W;
+      canvas.height = H;
+
+      // Kaomoji pools per row tier
+      const ALIEN_POOLS = [
+        // Tier 0 (aggressive)
+        ['ᕙ༼ ͝°益° ༽ᕗ', '(•́へ•́╬)', '凸(｀0´)凸', '(ง •_•)ง', 'ψ(｀∇´)ψ', 'o(≧口≦)o', '(▼ヘ▼#)', '凸ˋ_ˊ#'],
+        // Tier 1 (medium)
+        ['(✪ω✪)', '(*ΦωΦ*)', '(Θ３Θ)', 'Σ(っ°Д°;)っ', "(●'ω')旦", 'U•ェ•*U', '(=ｪ´=)ゞ', '(=ｪ´=)'],
+        // Tier 2 (cute)
+        ['(=^・ω・^=)', '(=①ω①=)', 'ฅ•̀∀•́ฅ', '(=￣ω￣=)', '(*^▽^*)', '(ꈍᴗꈍ)', '(✧◡✧)', '(=^𖥦^=)']
+      ];
+
+      const ALIEN_COLORS = [
+        // Tier 0: reds/oranges
+        ['#f87171', '#fb923c', '#ef4444', '#f97316', '#dc2626', '#ea580c', '#f59e0b', '#fbbf24'],
+        // Tier 1: purples/blues
+        ['#a78bfa', '#818cf8', '#93c5fd', '#c084fc', '#7c3aed', '#6366f1', '#8b5cf6', '#60a5fa'],
+        // Tier 2: pinks/greens
+        ['#f9a8d4', '#86efac', '#f472b6', '#6ee7b7', '#ec4899', '#10b981', '#fbcfe8', '#a7f3d0']
+      ];
+
+      const ALIEN_FONT = `${20 + Math.floor(Math.random() * 7)}px "Segoe UI Emoji", "Apple Color Emoji", sans-serif`;
+      const DEFENDER_FONT = '36px "Segoe UI Emoji", "Apple Color Emoji", sans-serif';
+      const BULLET_FONT = '20px "Segoe UI Emoji", "Apple Color Emoji", sans-serif';
+      const HIT_RADIUS = 30;
+
+      // Game state
+      let aliens = [];
+      let bullets = [];
+      let enemyBullets = [];
+      let particles = [];
+      let flashes = [];
+      let shockwaves = [];
+      let defender = { x: W / 2, y: H - 80, targetX: W / 2, vx: 0, paceUntil: 0, paceSpeed: 3.2, strafe: 0 };
+      let gameOver = false;
+      let gameResult = ''; // 'victory', 'escape', 'timeout'
+      let resultTimer = 0;
+      let resultShown = false;
+      let lastFireTime = 0;
+      let lastEnemyFireTime = 0;
+      let fireInterval = 230;
+      let enemyFireInterval = 520;
+      let startTime = performance.now();
+      let animId = null;
+      let fadeAlpha = 1;
+      let fadingOut = false;
+      let victorySparkles = [];
+      let totalKilled = 0;
+
+      // Uniform drop speed: aliens cross the full screen height in DURATION
+      // dropSpeedPerMs = H pixels / DURATION ms (time-based, frame-rate independent)
+      const dropSpeedPerMs = Math.max(0.001, H / DURATION);
+      let lastFrameTime = 0;
+      let frameCount = 0;
+      let lastSpawnTime = 0;
+      let spawnInterval = 350 + Math.random() * 250;
+
+      function spawnWave(now) {
+        const count = 2 + Math.floor(Math.random() * 5); // 2-6 aliens per wave
+        for (let i = 0; i < count; i++) {
+          const tier = Math.floor(Math.random() * 3);
+          const pool = ALIEN_POOLS[tier];
+          const colors = ALIEN_COLORS[tier];
+          aliens.push({
+            tier,
+            text: pool[Math.floor(Math.random() * pool.length)],
+            color: colors[Math.floor(Math.random() * colors.length)],
+            alive: true,
+            x: 40 + Math.random() * (W - 80),
+            y: -30 - Math.random() * 40,
+            wobbleOffset: Math.random() * Math.PI * 2,
+            drift: (Math.random() - 0.5) * 0.45,
+            hitAnim: 0,
+            hSpeed: 0.8 + Math.random() * 2.5,
+            hDir: Math.random() > 0.5 ? 1 : -1
+          });
+        }
+        lastSpawnTime = now;
+        spawnInterval = 350 + Math.random() * 250;
+      }
+
+      function aliveAliens() {
+        return aliens.filter(a => a.alive);
+      }
+
+      function getAlienScreenX(a) {
+        return a.x;
+      }
+      function getAlienScreenY(a) {
+        return a.y;
+      }
+
+      function spawnHitParticles(x, y, color) {
+        const symbols = ['★', '✧', '*', '✦', '✪', '✶', '💥', '✺'];
+        for (let i = 0; i < 14; i++) {
+          const angle = Math.random() * Math.PI * 2;
+          const speed = 2.5 + Math.random() * 7;
+          particles.push({
+            x, y,
+            vx: Math.cos(angle) * speed,
+            vy: Math.sin(angle) * speed,
+            life: 1,
+            decay: 0.02 + Math.random() * 0.02,
+            symbol: symbols[i % symbols.length],
+            color,
+            size: 14 + Math.random() * 10
+          });
+        }
+      }
+
+      function spawnFlash(x, y) {
+        flashes.push({ x, y, radius: 5, maxRadius: 40, alpha: 1 });
+        shockwaves.push({ x, y, radius: 8, alpha: 1, color: '#fef3c7' });
+      }
+
+      function pickTargetAlien() {
+        const alive = aliveAliens();
+        if (!alive.length) return null;
+        let best = null;
+        let bestScore = Infinity;
+        for (const a of alive) {
+          const sx = getAlienScreenX(a);
+          const sy = getAlienScreenY(a);
+          const score = Math.abs(sx - defender.x) * 1.25 + Math.abs(sy - defender.y) * 0.1 + Math.random() * 50;
+          if (score < bestScore) {
+            bestScore = score;
+            best = a;
+          }
+        }
+        return best;
+      }
+
+      function fireBullet() {
+        const target = pickTargetAlien();
+        const targetX = target ? getAlienScreenX(target) + (Math.random() - 0.5) * 30 : defender.x;
+        const dx = Math.max(-3.2, Math.min(3.2, (targetX - defender.x) / 70));
+        bullets.push({
+          x: defender.x,
+          y: defender.y - 20,
+          vx: dx,
+          speed: 14,
+          symbol: Math.random() > 0.5 ? '♡' : '✦',
+          active: true
+        });
+        if (Math.random() > 0.45) {
+          bullets.push({
+            x: defender.x + (Math.random() > 0.5 ? 16 : -16),
+            y: defender.y - 20,
+            vx: dx * 0.75 + (Math.random() - 0.5) * 1.2,
+            speed: 13,
+            symbol: '★',
+            active: true
+          });
+        }
+      }
+
+      function fireEnemyBullet(now) {
+        const alive = aliveAliens();
+        if (!alive.length) return;
+        const shooters = Math.min(4, 1 + Math.floor((now - startTime) / 5000));
+        for (let i = 0; i < shooters; i++) {
+          const a = alive[Math.floor(Math.random() * alive.length)];
+          const sx = getAlienScreenX(a);
+          const sy = getAlienScreenY(a);
+          const dx = defender.x - sx;
+          const dy = defender.y - sy;
+          const dist = Math.max(1, Math.sqrt(dx * dx + dy * dy));
+          const speed = 3.8 + Math.random() * 2.4;
+          enemyBullets.push({
+            x: sx,
+            y: sy + 12,
+            vx: dx / dist * speed + (Math.random() - 0.5) * 1.2,
+            vy: dy / dist * speed,
+            symbol: ['◆', '▼', '✹', '✦'][Math.floor(Math.random() * 4)],
+            color: a.color,
+            active: true
+          });
+        }
+      }
+
+      function checkCollisions() {
+        for (let b of bullets) {
+          if (!b.active) continue;
+          for (let a of aliens) {
+            if (!a.alive) continue;
+            const dx = b.x - getAlienScreenX(a);
+            const dy = b.y - getAlienScreenY(a);
+            if (Math.sqrt(dx * dx + dy * dy) < HIT_RADIUS) {
+              b.active = false;
+              a.alive = false;
+              a.hitAnim = 1;
+              totalKilled++;
+              spawnHitParticles(getAlienScreenX(a), getAlienScreenY(a), a.color);
+              spawnFlash(getAlienScreenX(a), getAlienScreenY(a));
+              return;
+            }
+          }
+        }
+      }
+
+      function update(now) {
+        if (!lastFrameTime) lastFrameTime = now;
+        const dt = Math.min(now - lastFrameTime, 50); // cap to avoid big jumps
+        lastFrameTime = now;
+        frameCount++;
+        const elapsed = now - startTime;
+
+        // Check timeout
+        if (!gameOver && elapsed >= DURATION) {
+          gameOver = true;
+          gameResult = 'timeout';
+          resultTimer = now;
+        }
+
+        if (gameOver) {
+          if (gameResult === 'timeout') {
+            // Remaining aliens fly upward and escape
+            for (let a of aliens) {
+              if (a.alive) {
+                a.y -= 4;
+              }
+            }
+          } else if (gameResult === 'escape') {
+            // Defender runs away
+            defender.x += (defender.x < W / 2 ? -6 : 6);
+          }
+          // After showing result, fade out
+          if (now - resultTimer > 2000 && !fadingOut) {
+            fadingOut = true;
+          }
+          if (fadingOut) {
+            fadeAlpha -= 0.02;
+            if (fadeAlpha <= 0) {
+              fadeAlpha = 0;
+              cancelAnimationFrame(animId);
+              window.close();
+              return;
+            }
+          }
+          // Keep updating visual effects during game-over
+          for (let p of particles) {
+            p.x += p.vx;
+            p.y += p.vy;
+            p.life -= p.decay;
+          }
+          particles = particles.filter(p => p.life > 0);
+          for (let f of flashes) {
+            f.radius += 3;
+            f.alpha -= 0.08;
+          }
+          flashes = flashes.filter(f => f.alpha > 0);
+          for (let w of shockwaves) {
+            w.radius += 8;
+            w.alpha -= 0.04;
+          }
+          shockwaves = shockwaves.filter(w => w.alpha > 0);
+          for (let s of victorySparkles) {
+            s.x += s.vx;
+            s.y += s.vy;
+            s.life -= s.decay;
+          }
+          victorySparkles = victorySparkles.filter(s => s.life > 0);
+          return;
+        }
+
+        // Continuously spawn new aliens throughout the game
+        if (now - lastSpawnTime > spawnInterval) {
+          spawnWave(now);
+        }
+
+        // Check if any alien reached defender level
+        const alive = aliveAliens();
+        for (let a of alive) {
+          if (getAlienScreenY(a) >= defender.y - 40) {
+            gameOver = true;
+            gameResult = 'escape';
+            resultTimer = now;
+            return;
+          }
+        }
+
+        // Per-alien movement: each has own horizontal speed, uniform downward (time-based)
+        for (let a of alive) {
+          a.y += dropSpeedPerMs * dt;
+          a.x += a.hSpeed * a.hDir;
+          // Bounce off screen edges individually
+          if (a.x >= W - 25 && a.hDir === 1) {
+            a.hDir = -1;
+          } else if (a.x <= 25 && a.hDir === -1) {
+            a.hDir = 1;
+          }
+        }
+
+        // Auto-fire defender bullets
+        if (now - lastFireTime > fireInterval) {
+          fireBullet();
+          lastFireTime = now;
+          fireInterval = 170 + Math.random() * 150;
+        }
+
+        if (now - lastEnemyFireTime > enemyFireInterval) {
+          fireEnemyBullet(now);
+          lastEnemyFireTime = now;
+          enemyFireInterval = Math.max(180, 560 - (now - startTime) / 60) + Math.random() * 140;
+        }
+
+        if (now > defender.paceUntil) {
+          defender.paceUntil = now + 350 + Math.random() * 850;
+          defender.paceSpeed = 1.4 + Math.random() * 5.8;
+          defender.strafe = (Math.random() - 0.5) * W * 0.22;
+        }
+        const targetAlien = pickTargetAlien();
+        if (targetAlien) {
+          const targetX = getAlienScreenX(targetAlien) + defender.strafe + Math.sin(now * 0.004) * 42;
+          const dx = Math.max(-defender.paceSpeed, Math.min(defender.paceSpeed, (targetX - defender.x) * 0.055));
+          defender.vx = defender.vx * 0.72 + dx * 0.28;
+          defender.x += defender.vx;
+          if (defender.x < 38) { defender.x = 38; defender.vx *= -0.55; }
+          if (defender.x > W - 38) { defender.x = W - 38; defender.vx *= -0.55; }
+        }
+
+        // Update bullets
+        for (let b of bullets) {
+          if (!b.active) continue;
+          b.x += b.vx || 0;
+          b.y -= b.speed;
+          if (b.y < -20) b.active = false;
+        }
+        bullets = bullets.filter(b => b.active);
+
+        for (let eb of enemyBullets) {
+          if (!eb.active) continue;
+          eb.x += eb.vx;
+          eb.y += eb.vy;
+          if (eb.x < -40 || eb.x > W + 40 || eb.y > H + 40) eb.active = false;
+          if (Math.hypot(eb.x - defender.x, eb.y - defender.y) < 34) {
+            eb.active = false;
+            spawnHitParticles(defender.x, defender.y, '#fde68a');
+            spawnFlash(defender.x, defender.y);
+            defender.x += (Math.random() - 0.5) * 60;
+          }
+        }
+        enemyBullets = enemyBullets.filter(b => b.active);
+
+        // Check collisions
+        checkCollisions();
+
+        // Clean up dead aliens that finished their hit animation
+        aliens = aliens.filter(a => a.alive || a.hitAnim > 0);
+
+        // Update particles
+        for (let p of particles) {
+          p.x += p.vx;
+          p.y += p.vy;
+          p.life -= p.decay;
+        }
+        particles = particles.filter(p => p.life > 0);
+
+        // Update flashes
+        for (let f of flashes) {
+          f.radius += 3;
+          f.alpha -= 0.08;
+        }
+        flashes = flashes.filter(f => f.alpha > 0);
+
+        for (let w of shockwaves) {
+          w.radius += 8;
+          w.alpha -= 0.04;
+        }
+        shockwaves = shockwaves.filter(w => w.alpha > 0);
+
+        // Update victory sparkles
+        for (let s of victorySparkles) {
+          s.x += s.vx;
+          s.y += s.vy;
+          s.life -= s.decay;
+        }
+        victorySparkles = victorySparkles.filter(s => s.life > 0);
+      }
+
+      function draw(now) {
+        ctx.clearRect(0, 0, W, H);
+        ctx.globalAlpha = fadeAlpha;
+
+        // Draw aliens
+        for (let a of aliens) {
+          if (!a.alive && a.hitAnim <= 0) continue;
+          const sx = getAlienScreenX(a);
+          const sy = getAlienScreenY(a);
+
+          if (!a.alive && a.hitAnim > 0) {
+            // Hit animation: flash white, scale up, fade
+            ctx.save();
+            ctx.globalAlpha = a.hitAnim * fadeAlpha;
+            const scale = 1 + (1 - a.hitAnim) * 0.5;
+            ctx.translate(sx, sy);
+            ctx.scale(scale, scale);
+            ctx.font = ALIEN_FONT;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillStyle = '#ffffff';
+            ctx.fillText(a.text, 0, 0);
+            ctx.restore();
+            a.hitAnim -= 0.08;
+            continue;
+          }
+
+          if (!a.alive) continue;
+
+          // Wobble
+          const wobble = Math.sin(now * 0.004 + a.wobbleOffset) * 3 + Math.sin(now * 0.0015 + a.wobbleOffset * 3) * 5 * a.drift;
+          const battleScale = 1 + Math.sin(now * 0.01 + a.wobbleOffset) * 0.06;
+
+          ctx.save();
+          ctx.translate(sx + wobble, sy);
+          ctx.scale(battleScale, battleScale);
+          ctx.font = ALIEN_FONT;
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillStyle = a.color;
+          ctx.shadowColor = a.color;
+          ctx.shadowBlur = 8;
+          ctx.fillText(a.text, 0, 0);
+          ctx.restore();
+        }
+
+        // Draw bullets
+        for (let b of bullets) {
+          if (!b.active) continue;
+          ctx.save();
+          ctx.font = BULLET_FONT;
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillStyle = '#f472b6';
+          ctx.shadowColor = '#f472b6';
+          ctx.shadowBlur = 12;
+          ctx.fillText(b.symbol || '♡', b.x, b.y);
+          ctx.restore();
+        }
+
+        for (let eb of enemyBullets) {
+          if (!eb.active) continue;
+          ctx.save();
+          ctx.font = BULLET_FONT;
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillStyle = eb.color;
+          ctx.shadowColor = eb.color;
+          ctx.shadowBlur = 16;
+          ctx.fillText(eb.symbol, eb.x, eb.y);
+          ctx.restore();
+        }
+
+        // Draw defender
+        ctx.save();
+        ctx.font = DEFENDER_FONT;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillStyle = '#fde68a';
+        ctx.shadowColor = '#fde68a';
+        ctx.shadowBlur = 20;
+        ctx.fillText('(=^・ω・^=)', defender.x, defender.y);
+        ctx.restore();
+
+        // Draw particles
+        for (let p of particles) {
+          ctx.save();
+          ctx.globalAlpha = p.life * fadeAlpha;
+          ctx.font = `${p.size}px "Segoe UI Emoji", "Apple Color Emoji", sans-serif`;
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillStyle = p.color;
+          ctx.shadowColor = p.color;
+          ctx.shadowBlur = 6;
+          ctx.fillText(p.symbol, p.x, p.y);
+          ctx.restore();
+        }
+
+        // Draw flashes
+        for (let f of flashes) {
+          ctx.save();
+          ctx.globalAlpha = f.alpha * fadeAlpha;
+          ctx.beginPath();
+          ctx.arc(f.x, f.y, f.radius, 0, Math.PI * 2);
+          ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
+          ctx.fill();
+          ctx.restore();
+        }
+
+        for (let w of shockwaves) {
+          ctx.save();
+          ctx.globalAlpha = w.alpha * fadeAlpha;
+          ctx.beginPath();
+          ctx.arc(w.x, w.y, w.radius, 0, Math.PI * 2);
+          ctx.strokeStyle = w.color;
+          ctx.lineWidth = 3;
+          ctx.shadowColor = w.color;
+          ctx.shadowBlur = 16;
+          ctx.stroke();
+          ctx.restore();
+        }
+
+        // Victory sparkles
+        for (let s of victorySparkles) {
+          ctx.save();
+          ctx.globalAlpha = s.life * fadeAlpha;
+          ctx.font = `${s.size}px "Segoe UI Emoji", "Apple Color Emoji", sans-serif`;
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillStyle = s.color;
+          ctx.shadowColor = s.color;
+          ctx.shadowBlur = 10;
+          ctx.fillText(s.symbol, s.x, s.y);
+          ctx.restore();
+        }
+
+        // Victory text
+        if (gameResult === 'victory' && gameOver) {
+          ctx.save();
+          ctx.globalAlpha = fadeAlpha;
+          ctx.font = 'bold 48px "Segoe UI", sans-serif';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillStyle = '#fde68a';
+          ctx.shadowColor = '#fde68a';
+          ctx.shadowBlur = 30;
+          ctx.fillText('VICTORY! ★', W / 2, H / 2);
+          ctx.restore();
+        }
+
+        ctx.globalAlpha = 1;
+      }
+
+      function gameLoop(now) {
+        update(now);
+        draw(now);
+        if (fadeAlpha > 0) {
+          animId = requestAnimationFrame(gameLoop);
+        }
+      }
+
+      animId = requestAnimationFrame(gameLoop);
+    });
+  </script>
+</body>
+</html>

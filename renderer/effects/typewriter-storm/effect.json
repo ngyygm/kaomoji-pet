@@ -1,0 +1,25 @@
+{
+  "id": "typewriter-storm",
+  "name": "打字机风暴",
+  "emoji": "⌨",
+  "order": 130,
+  "version": "1.0.0",
+  "description": "字符像打字机一样逐行敲出，再被风吹散。",
+  "entry": "index.html",
+  "duration": 12500,
+  "window": {
+    "type": "fullscreen-transparent",
+    "clickThrough": true,
+    "focusable": false,
+    "alwaysOnTop": true
+  },
+  "pet": {
+    "animation": "curious",
+    "animationDuration": 2600,
+    "particles": null
+  },
+  "params": {
+    "duration": { "type": "number", "default": 12500 }
+  },
+  "enabled": true
+}

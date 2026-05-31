@@ -1,0 +1,26 @@
+{
+  "id": "parade",
+  "name": "颜文字大阅兵",
+  "emoji": "🎖",
+  "order": 40,
+  "version": "1.0.0",
+  "description": "颜文字队伍横穿屏幕。",
+  "entry": "index.html",
+  "startChannel": "show-parade",
+  "duration": 16000,
+  "window": {
+    "type": "fullscreen-transparent",
+    "clickThrough": true,
+    "focusable": false,
+    "alwaysOnTop": true
+  },
+  "pet": {
+    "animation": "surprised",
+    "animationDuration": 3000,
+    "particles": null
+  },
+  "params": {
+    "duration": { "type": "number", "default": 16000 }
+  },
+  "enabled": true
+}

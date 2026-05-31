@@ -1,0 +1,26 @@
+{
+  "id": "fireworks",
+  "name": "烟花大会",
+  "emoji": "🎆",
+  "order": 80,
+  "version": "1.0.0",
+  "description": "全屏颜文字烟花。",
+  "entry": "index.html",
+  "startChannel": "show-fireworks",
+  "duration": 16000,
+  "window": {
+    "type": "fullscreen-transparent",
+    "clickThrough": true,
+    "focusable": false,
+    "alwaysOnTop": true
+  },
+  "pet": {
+    "animation": "happy",
+    "animationDuration": 3000,
+    "particles": ["sparkle", 8]
+  },
+  "params": {
+    "duration": { "type": "number", "default": 16000 }
+  },
+  "enabled": true
+}

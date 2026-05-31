@@ -1,0 +1,26 @@
+{
+  "id": "bullet-waltz",
+  "name": "弹幕华尔兹",
+  "emoji": "💫",
+  "order": 60,
+  "version": "1.0.0",
+  "description": "全屏弹幕轨迹特效。",
+  "entry": "index.html",
+  "startChannel": "show-bullet-waltz",
+  "duration": 16000,
+  "window": {
+    "type": "fullscreen-transparent",
+    "clickThrough": true,
+    "focusable": false,
+    "alwaysOnTop": true
+  },
+  "pet": {
+    "animation": "happy",
+    "animationDuration": 3000,
+    "particles": null
+  },
+  "params": {
+    "duration": { "type": "number", "default": 16000 }
+  },
+  "enabled": true
+}

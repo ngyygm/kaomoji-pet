@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head><meta charset="UTF-8"><title> </title><style>*{margin:0;padding:0;user-select:none}html,body{width:100%;height:100%;overflow:hidden;background:transparent}canvas{display:block;width:100%;height:100%}</style></head>
+<body><canvas id="fx"></canvas><script>
+const { ipcRenderer } = require('electron');
+ipcRenderer.on('effect:start', (event, payload) => start(payload?.duration || 13000));
+function start(duration) {
+  const canvas = document.getElementById('fx'), ctx = canvas.getContext('2d');
+  const W = canvas.width = window.innerWidth, H = canvas.height = window.innerHeight;
+  const faces = ['(=^・ω・^=)','(✧◡✧)','(・ω<)☆','(｡◕‿◕｡)','(๑>◡<๑)','(ღ˘︶˘ღ)','(ꈍᴗꈍ)','(★^O^★)'];
+  const colors = ['#fde68a','#93c5fd','#f9a8d4','#86efac','#c084fc'];
+  const pick = a => a[Math.floor(Math.random()*a.length)];
+  const points = Array.from({length: 18}, (_, i) => {
+    const band = i / 18;
+    return { x: W*(0.08+Math.random()*0.84), y: H*(0.12+Math.random()*0.7), tx: W*(0.1+band*0.8), ty: H*(0.18+Math.random()*0.62), text: pick(faces), color: pick(colors), phase: Math.random()*6 };
+  });
+  let startTime = performance.now();
+  function loop(now) {
+    const elapsed = now - startTime, progress = Math.min(1, elapsed / (duration * 0.72)), fade = Math.max(0, Math.min(1, (duration-elapsed)/800));
+    ctx.clearRect(0,0,W,H); ctx.globalAlpha = fade;
+    for (const p of points) {
+      p.x += (p.tx - p.x) * 0.025; p.y += (p.ty - p.y) * 0.025;
+    }
+    ctx.lineWidth = 2;
+    for (let i=0;i<points.length-1;i++) {
+      const p = points[i], q = points[i+1], reveal = Math.min(1, Math.max(0, progress*points.length - i));
+      ctx.globalAlpha = reveal * 0.65 * fade; ctx.strokeStyle = p.color; ctx.shadowColor = p.color; ctx.shadowBlur = 10;
+      ctx.beginPath(); ctx.moveTo(p.x,p.y); ctx.lineTo(p.x+(q.x-p.x)*reveal,p.y+(q.y-p.y)*reveal); ctx.stroke();
+      if (i % 4 === 0 && i + 4 < points.length) { ctx.globalAlpha = reveal*0.25*fade; ctx.beginPath(); ctx.moveTo(p.x,p.y); ctx.lineTo(points[i+4].x,points[i+4].y); ctx.stroke(); }
+    }
+    for (const p of points) {
+      const pulse = 1 + Math.sin(now*0.004+p.phase)*0.18;
+      ctx.globalAlpha = fade; ctx.font = `${18 + 14*pulse}px "Segoe UI Emoji", sans-serif`; ctx.fillStyle=p.color; ctx.shadowColor=p.color; ctx.shadowBlur=18;
+      ctx.fillText(p.text, p.x-28, p.y+8);
+    }
+    ctx.globalAlpha = fade * Math.min(1, progress*2); ctx.font='34px "Microsoft YaHei", sans-serif'; ctx.fillStyle='#fff'; ctx.shadowBlur=20; ctx.fillText('今日星图已生成', W/2-125, H*0.88);
+    if (elapsed < duration) requestAnimationFrame(loop); else window.close();
+  }
+  requestAnimationFrame(loop);
+}
+</script></body></html>

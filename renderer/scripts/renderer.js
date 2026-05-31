@@ -321,6 +321,7 @@ class PetRenderer {
       if (elR && choice.arms[1]) { elR.textContent = choice.arms[1]; elR.style.display = 'inline-block'; }
       this._segmentAnimator.play('seg-arm-l', 'arm', choice.armAnimL || choice.anim || 'appear');
       this._segmentAnimator.play('seg-arm-r', 'arm', choice.armAnimR || choice.anim || 'appear');
+      this.playArmAction(choice.action || 'auto');
     } else if (pick === 'deco') {
       const elL = this.kaomojiEl.querySelector('.seg-deco-l');
       const elR = this.kaomojiEl.querySelector('.seg-deco-r');
@@ -370,6 +371,9 @@ class PetRenderer {
     }
 
     this.applyMoodColor(mood);
+    if (Math.random() < 0.35) {
+      setTimeout(() => this.playArmAction('auto'), 180);
+    }
     this.currentAnimation = mood;
   }
 
@@ -432,6 +436,8 @@ class PetRenderer {
       case 'arm':
         if ('ヽヾψΨ'.includes(text)) return 'wave';
         if (text === '凸') return 'point';
+        if ('╯٩ᕙᕗง'.includes(text)) return 'throw';
+        if ('φσლ'.includes(text)) return 'shoot';
         return 'appear';
       case 'deco': return 'appear';
       case 'bound': return 'transition';
@@ -589,6 +595,69 @@ class PetRenderer {
     toast.textContent = message;
     container.appendChild(toast);
     setTimeout(() => toast.remove(), duration);
+  }
+
+  playArmAction(action = 'auto') {
+    const left = this.kaomojiEl.querySelector('.seg-arm-l');
+    const right = this.kaomojiEl.querySelector('.seg-arm-r');
+    const arms = [left, right].filter(el => el && el.textContent.trim());
+    if (arms.length === 0) return;
+
+    const text = arms.map(el => el.textContent).join('');
+    let resolved = action;
+    if (resolved === 'auto') {
+      if (/[凸ง拳]/.test(text)) resolved = 'shoot';
+      else if (/[╯投]/.test(text)) resolved = 'throw';
+      else if (/[ヽヾψΨ٩]/.test(text)) resolved = 'wave';
+      else if (/[ლσφ]/.test(text)) resolved = 'toss';
+      else if (/[oＯ]/.test(text)) resolved = 'clap';
+      else resolved = ['wave', 'shiver', 'throw'][Math.floor(Math.random() * 3)];
+    }
+
+    const cssClass = resolved === 'toss' ? 'throw' : resolved;
+    for (const arm of arms) {
+      arm.classList.remove('wave', 'throw', 'shoot', 'shake', 'clap');
+      void arm.offsetWidth;
+      arm.classList.add(cssClass === 'shiver' ? 'shake' : cssClass);
+    }
+
+    if (resolved === 'throw' || resolved === 'toss') {
+      this.spawnArmProjectiles(arms, ['★', '✧', '♡', '●'], 3, 900);
+    } else if (resolved === 'shoot') {
+      this.spawnArmProjectiles(arms, ['✦', '!', '✧'], 5, 650);
+    } else if (resolved === 'clap') {
+      this.spawnParticles('note', 3);
+    } else if (resolved === 'wave') {
+      this.spawnParticles('sparkle', 2);
+    }
+  }
+
+  spawnArmProjectiles(arms, symbols, count = 3, duration = 800) {
+    const container = document.getElementById('pet-container');
+    const cRect = container.getBoundingClientRect();
+    for (const arm of arms) {
+      const r = arm.getBoundingClientRect();
+      const originX = r.left - cRect.left + r.width / 2;
+      const originY = r.top - cRect.top + r.height / 2;
+      const dir = arm.classList.contains('seg-arm-l') ? -1 : 1;
+      for (let i = 0; i < count; i++) {
+        const el = document.createElement('span');
+        el.className = 'arm-projectile';
+        el.textContent = symbols[Math.floor(Math.random() * symbols.length)];
+        const tx = dir * (55 + Math.random() * 75);
+        const ty = -20 + Math.random() * 70;
+        el.style.left = originX + 'px';
+        el.style.top = originY + 'px';
+        el.style.color = ['#fde68a', '#f9a8d4', '#93c5fd', '#86efac'][Math.floor(Math.random() * 4)];
+        el.style.fontSize = (12 + Math.random() * 10) + 'px';
+        el.style.setProperty('--tx', tx + 'px');
+        el.style.setProperty('--ty', ty + 'px');
+        el.style.setProperty('--duration', duration + 'ms');
+        el.style.animationDelay = (i * 70) + 'ms';
+        container.appendChild(el);
+        setTimeout(() => el.remove(), duration + 250 + i * 70);
+      }
+    }
   }
 
   // === Walking ===
@@ -980,6 +1049,11 @@ const MICRO_EXPRESSIONS = {
     { arms: ['ヽ', 'ﾉ'], anim: 'appear', armAnimL: 'wave', armAnimR: 'wave' },
     { arms: ['o', 'o'], anim: 'appear' },
     { arms: ['凸', ''], anim: 'appear', armAnimL: 'point' },
+    { arms: ['╰', '╯'], anim: 'throw', action: 'throw' },
+    { arms: ['(ง', 'ง)'], anim: 'shoot', action: 'shoot' },
+    { arms: ['٩', 'و'], anim: 'wave', action: 'wave' },
+    { arms: ['ლ', 'ლ'], anim: 'throw', action: 'toss' },
+    { arms: ['o', 'o'], anim: 'clap', action: 'clap' },
   ],
   deco: [
     { deco: ['☆', '☆'], anim: 'appear' },
@@ -1018,6 +1092,27 @@ class SegmentAnimator {
         { transform: 'rotate(0deg)' }
       ], duration: 500 },
       point:      { from: 'translateX(-5px) scale(0.8)', to: 'translateX(0) scale(1)', duration: 250, easing: 'cubic-bezier(0.34,1.56,0.64,1)' },
+      throw:      { frames: [
+        { transform: 'rotate(0deg) translateY(0)' },
+        { transform: 'rotate(-36deg) translateY(-5px)' },
+        { transform: 'rotate(18deg) translateY(2px)' }
+      ], duration: 520, easing: 'ease-out' },
+      shoot:      { frames: [
+        { transform: 'translateX(0) scale(1)' },
+        { transform: 'translateX(7px) scale(1.18)' },
+        { transform: 'translateX(0) scale(1)' }
+      ], duration: 220, easing: 'ease-out' },
+      shiver:     { frames: [
+        { transform: 'translate(0, 0)' },
+        { transform: 'translate(3px, -2px)' },
+        { transform: 'translate(-2px, 2px)' },
+        { transform: 'translate(0, 0)' }
+      ], duration: 220, easing: 'ease-in-out' },
+      clap:       { frames: [
+        { transform: 'translateX(0) rotate(0deg)' },
+        { transform: 'translateX(8px) rotate(12deg)' },
+        { transform: 'translateX(0) rotate(0deg)' }
+      ], duration: 260, easing: 'ease-in-out' },
     },
     deco: {
       appear:     { from: 'scale(0.3) opacity(0.3)', to: 'scale(1) opacity(1)', duration: 300, easing: 'ease-out' },

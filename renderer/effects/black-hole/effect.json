@@ -1,0 +1,25 @@
+{
+  "id": "black-hole",
+  "name": "黑洞吸猫",
+  "emoji": "🕳",
+  "order": 100,
+  "version": "1.0.0",
+  "description": "颜文字和星光被中心黑洞旋转吸入再喷出。",
+  "entry": "index.html",
+  "duration": 12000,
+  "window": {
+    "type": "fullscreen-transparent",
+    "clickThrough": true,
+    "focusable": false,
+    "alwaysOnTop": true
+  },
+  "pet": {
+    "animation": "surprised",
+    "animationDuration": 2600,
+    "particles": null
+  },
+  "params": {
+    "duration": { "type": "number", "default": 12000 }
+  },
+  "enabled": true
+}

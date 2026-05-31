@@ -1,0 +1,25 @@
+{
+  "id": "portal-hop",
+  "name": "传送门乱跳",
+  "emoji": "🌀",
+  "order": 120,
+  "version": "1.0.0",
+  "description": "颜文字在多个彩色传送门之间跳跃弹出。",
+  "entry": "index.html",
+  "duration": 12000,
+  "window": {
+    "type": "fullscreen-transparent",
+    "clickThrough": true,
+    "focusable": false,
+    "alwaysOnTop": true
+  },
+  "pet": {
+    "animation": "playing",
+    "animationDuration": 2600,
+    "particles": null
+  },
+  "params": {
+    "duration": { "type": "number", "default": 12000 }
+  },
+  "enabled": true
+}

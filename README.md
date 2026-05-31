@@ -78,8 +78,10 @@ kaomoji-pet/
 ├── preload.js                 # IPC bridge
 ├── renderer/
 │   ├── index.html             # Main UI
-│   ├── care-rain.html         # Encouragement overlay
-│   ├── prank-giant.html       # Easter egg overlay
+│   ├── effects/               # Drop-in big effect folders
+│   │   ├── README.md          # Effect folder specification
+│   │   ├── _template/         # Copy this to create a new effect
+│   │   └── <effect-id>/       # effect.json + index.html + optional assets
 │   ├── styles/main.css        # Styles
 │   └── scripts/
 │       ├── app.js             # App entry

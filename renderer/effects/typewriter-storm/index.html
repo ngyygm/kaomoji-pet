@@ -1,0 +1,13 @@
+<!DOCTYPE html>
+<html lang="zh-CN"><head><meta charset="UTF-8"><title> </title><style>*{margin:0;padding:0;user-select:none}html,body{width:100%;height:100%;overflow:hidden;background:transparent}.glyph{position:absolute;font-family:"Segoe UI Emoji","Microsoft YaHei",sans-serif;white-space:nowrap;pointer-events:none;text-shadow:0 0 14px currentColor}.cursor{position:absolute;width:14px;height:34px;background:#fde68a;box-shadow:0 0 18px #fde68a}</style></head><body><div class="cursor"></div><script>
+const { ipcRenderer } = require('electron');
+ipcRenderer.on('effect:start',(event,payload)=>start(payload?.duration||12500));
+function start(duration){const W=innerWidth,H=innerHeight, lines=['今天也在认真运行中','(=^・ω・^=) 记录一颗星','错误已被可爱化处理','灵感缓存命中 100%','把烦恼折成纸飞机','٩(๑❛ᴗ❛๑)۶ 好耶'];const colors=['#fde68a','#93c5fd','#f9a8d4','#86efac','#c084fc'];const cursor=document.querySelector('.cursor');let chars=[],idx=0,line=0,col=0,last=performance.now(),startTime=last,wind=false;const pick=a=>a[Math.floor(Math.random()*a.length)];
+function addChar(){const text=lines[line%lines.length];if(col>=text.length){line++;col=0;idx=0;return;}const e=document.createElement('div');e.className='glyph';e.textContent=text[col++];e.style.color=pick(colors);e.style.fontSize=24+Math.random()*18+'px';const x=W*.12+idx*28,y=H*.16+(line%7)*58;e.style.left=x+'px';e.style.top=y+'px';document.body.appendChild(e);chars.push({el:e,x,y,vx:0,vy:0,rot:0});idx++;}
+function loop(now){const elapsed=now-startTime,fade=Math.max(0,Math.min(1,(duration-elapsed)/700));if(!wind&&elapsed>duration*.55){wind=true;chars.forEach(c=>{c.vx=4+Math.random()*9;c.vy=(Math.random()-.5)*5;c.rot=(Math.random()-.5)*18;});}
+if(!wind&&now-last>36){last=now;addChar();if(Math.random()<.25)addChar();}
+chars.forEach(c=>{if(wind){c.x+=c.vx;c.y+=c.vy;c.vy+=.03;c.el.style.transform=`rotate(${c.rot*(elapsed-duration*.55)*.01}deg)`;}c.el.style.opacity=fade;c.el.style.left=c.x+'px';c.el.style.top=c.y+'px';});
+const active=chars[chars.length-1];if(active&&!wind){cursor.style.left=active.x+28+'px';cursor.style.top=active.y+'px';cursor.style.opacity=Math.sin(now*.02)>0?fade:0;}else cursor.style.opacity=0;
+chars=chars.filter(c=>c.x<W+200&&c.y>-100&&c.y<H+120);if(elapsed<duration)requestAnimationFrame(loop);else window.close();}
+requestAnimationFrame(loop);}
+</script></body></html>

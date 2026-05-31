@@ -1,0 +1,30 @@
+{
+  "id": "billiard",
+  "name": "台球弹跳",
+  "emoji": "🎉",
+  "order": 10,
+  "version": "1.0.0",
+  "description": "全屏透明窗口中的颜文字台球弹跳。",
+  "entry": "index.html",
+  "startChannel": "show-giant",
+  "duration": 9000,
+  "closeBufferMs": 0,
+  "window": {
+    "type": "fullscreen-transparent",
+    "clickThrough": true,
+    "focusable": false,
+    "alwaysOnTop": true
+  },
+  "pet": {
+    "animation": "surprised",
+    "animationDuration": 3000,
+    "particles": null
+  },
+  "params": {
+    "duration": { "type": "number", "default": 9000 },
+    "mode": { "type": "string", "default": "billiard" },
+    "kaomoji": { "type": "string", "default": null },
+    "color": { "type": "string", "default": null }
+  },
+  "enabled": true
+}

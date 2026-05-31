@@ -1,0 +1,25 @@
+{
+  "id": "constellation",
+  "name": "星座连线",
+  "emoji": "🌌",
+  "order": 110,
+  "version": "1.0.0",
+  "description": "颜文字星点自动连成星座图案。",
+  "entry": "index.html",
+  "duration": 13000,
+  "window": {
+    "type": "fullscreen-transparent",
+    "clickThrough": true,
+    "focusable": false,
+    "alwaysOnTop": true
+  },
+  "pet": {
+    "animation": "curious",
+    "animationDuration": 2600,
+    "particles": ["sparkle", 4]
+  },
+  "params": {
+    "duration": { "type": "number", "default": 13000 }
+  },
+  "enabled": true
+}

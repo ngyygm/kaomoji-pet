@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="zh-CN"><head><meta charset="UTF-8"><title> </title><style>*{margin:0;padding:0;user-select:none}html,body{width:100%;height:100%;overflow:hidden;background:transparent}.portal,.face,.pop{position:absolute;pointer-events:none;will-change:transform,opacity}.portal{border-radius:50%;border:4px solid;box-shadow:0 0 28px currentColor inset,0 0 26px currentColor}.face{font-family:"Segoe UI Emoji",sans-serif;text-shadow:0 0 22px currentColor;white-space:nowrap}.pop{font-family:"Segoe UI Emoji",sans-serif}</style></head>
+<body><script>
+const { ipcRenderer } = require('electron');
+ipcRenderer.on('effect:start', (event, payload) => start(payload?.duration || 12000));
+function start(duration) {
+  const W=innerWidth,H=innerHeight, colors=['#67e8f9','#f9a8d4','#fde68a','#86efac','#c084fc'], faces=['(=^・ω・^=)','(ﾉ≧∀≦)ﾉ','Σ(っ°Д°;)っ','(✧◡✧)','(・ω<)☆'];
+  const pick=a=>a[Math.floor(Math.random()*a.length)];
+  const portals=Array.from({length:7},(_,i)=>({x:W*(0.12+Math.random()*0.76),y:H*(0.14+Math.random()*0.68),r:48+Math.random()*42,color:pick(colors),phase:Math.random()*6}));
+  portals.forEach(p=>{const el=document.createElement('div');el.className='portal';el.style.width=el.style.height=p.r*2+'px';el.style.color=p.color;el.style.left=p.x-p.r+'px';el.style.top=p.y-p.r+'px';document.body.appendChild(el);p.el=el;});
+  const face=document.createElement('div');face.className='face';face.style.fontSize='42px';document.body.appendChild(face);
+  let startTime=performance.now(), hopAt=0, from=portals[0], to=portals[1], hopStart=0, hopDur=700;
+  function burst(p){for(let i=0;i<10;i++){const e=document.createElement('div');e.className='pop';e.textContent=pick(['✦','★','♡','◇','!']);e.style.color=p.color;e.style.left=p.x+'px';e.style.top=p.y+'px';e.style.fontSize=14+Math.random()*18+'px';document.body.appendChild(e);const a=Math.random()*Math.PI*2,d=45+Math.random()*70;e.animate([{opacity:1,transform:'translate(-50%,-50%) scale(.5)'},{opacity:0,transform:`translate(${Math.cos(a)*d}px,${Math.sin(a)*d}px) scale(1.4)`}],{duration:650,easing:'ease-out'}).onfinish=()=>e.remove();}}
+  function loop(now){const elapsed=now-startTime,fade=Math.max(0,Math.min(1,(duration-elapsed)/600));if(now>hopAt){from=to;to=pick(portals.filter(p=>p!==from));hopStart=now;hopDur=520+Math.random()*560;hopAt=now+hopDur+160+Math.random()*260;face.textContent=pick(faces);face.style.color=to.color;burst(from);burst(to);}
+    portals.forEach((p,i)=>{const spin=now*.08+i*40;p.el.style.opacity=fade*.8;p.el.style.transform=`rotate(${spin}deg) scale(${1+Math.sin(now*.004+p.phase)*.08})`;});
+    const t=Math.min(1,(now-hopStart)/hopDur), ease=1-Math.pow(1-t,3), x=from.x+(to.x-from.x)*ease, y=from.y+(to.y-from.y)*ease-Math.sin(t*Math.PI)*120;
+    face.style.opacity=fade;face.style.left=x+'px';face.style.top=y+'px';face.style.transform=`translate(-50%,-50%) rotate(${Math.sin(t*Math.PI)*28}deg) scale(${.7+Math.sin(t*Math.PI)*.8})`;
+    if(elapsed<duration)requestAnimationFrame(loop);else window.close();}
+  requestAnimationFrame(loop);
+}
+</script></body></html>

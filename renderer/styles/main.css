@@ -26,6 +26,7 @@ html, body {
   flex-direction: column;
   align-items: center;
   justify-content: center;
+  pointer-events: none;
 }
 
 /* Interactive elements: no drag */
@@ -84,6 +85,7 @@ html, body {
   cursor: grab;
   -webkit-app-region: drag;
   flex-shrink: 0;
+  pointer-events: none;
 }
 
 #combo-count {
@@ -120,8 +122,8 @@ html, body {
   position: relative;
   letter-spacing: 4px;
   margin-right: -4px;
-  text-indent: -14px;
   transition: opacity 0.3s ease, transform 0.3s ease-out, color 1.5s ease, text-shadow 1.5s ease;
+  pointer-events: auto;
 }
 
 /* === CSS Animation Classes === */
@@ -222,6 +224,7 @@ html, body {
   width: 100%;
   padding: 2px 8px 4px;
   animation: slideUp 0.2s ease;
+  pointer-events: auto;
 }
 
 #bottom-section.visible {
@@ -271,11 +274,20 @@ html, body {
   border: 1px solid rgba(200, 180, 210, 0.25);
   border-radius: 8px;
   padding: 3px;
-  min-width: 80px;
+  width: 155px;
+  max-height: calc(100vh - 8px);
+  overflow-y: auto;
   backdrop-filter: blur(15px);
   z-index: 200;
   animation: fadeIn 0.15s ease;
   box-shadow: 0 2px 10px rgba(129, 140, 248, 0.1);
+  pointer-events: auto;
+}
+
+#context-menu::-webkit-scrollbar { width: 3px; }
+#context-menu::-webkit-scrollbar-thumb {
+  background: rgba(129, 140, 248, 0.3);
+  border-radius: 3px;
 }
 
 .ctx-item {
@@ -288,6 +300,27 @@ html, body {
 }
 
 .ctx-item:hover { background: rgba(129, 140, 248, 0.08); }
+
+.ctx-header {
+  padding: 2px 10px 4px;
+  font-size: 11px;
+  color: #aaa;
+  border-bottom: 1px solid rgba(200, 180, 210, 0.2);
+  margin-bottom: 2px;
+}
+
+.ctx-back {
+  color: #888;
+  border-bottom: 1px solid rgba(200, 180, 210, 0.2);
+  margin-bottom: 1px;
+}
+
+.ctx-disabled {
+  color: #aaa;
+  cursor: default;
+}
+
+.ctx-disabled:hover { background: transparent; }
 
 .ctx-separator {
   height: 1px;
@@ -407,6 +440,10 @@ html, body {
 
 #kaomoji .seg-mouth.bounce { animation: segBounce 0.3s ease; }
 #kaomoji .seg-arm-r.wave, #kaomoji .seg-arm-l.wave { animation: segWave 0.5s ease 3; }
+#kaomoji .seg-arm-r.throw, #kaomoji .seg-arm-l.throw { animation: segThrow 0.55s ease-out 2; }
+#kaomoji .seg-arm-r.shoot, #kaomoji .seg-arm-l.shoot { animation: segShoot 0.22s ease-out 5; }
+#kaomoji .seg-arm-r.clap, #kaomoji .seg-arm-l.clap { animation: segClap 0.28s ease-in-out 6; }
+#kaomoji .seg-arm-r.shake, #kaomoji .seg-arm-l.shake { animation: segArmShake 0.12s ease-in-out 10; }
 #kaomoji .seg-ear-l.twitch, #kaomoji .seg-ear-r.twitch { animation: segTwitch 0.2s ease 3; }
 #kaomoji .seg-eye-r.drip { animation: segDrip 1.5s ease infinite; }
 #kaomoji .seg-deco-l.sparkle, #kaomoji .seg-deco-r.sparkle { animation: segSparkle 0.5s ease infinite alternate; }
@@ -415,6 +452,10 @@ html, body {
 @keyframes segShake { 0%, 100% { transform: translateX(0); } 50% { transform: translateX(2px); } }
 @keyframes segBounce { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.4); } }
 @keyframes segWave { 0%, 100% { transform: rotate(0deg); } 50% { transform: rotate(20deg); } }
+@keyframes segThrow { 0% { transform: rotate(0deg) translateY(0); } 45% { transform: rotate(-38deg) translateY(-5px); } 100% { transform: rotate(18deg) translateY(2px); } }
+@keyframes segShoot { 0%, 100% { transform: translateX(0) scale(1); } 45% { transform: translateX(7px) scale(1.18); } }
+@keyframes segClap { 0%, 100% { transform: translateX(0) rotate(0deg); } 50% { transform: translateX(8px) rotate(12deg); } }
+@keyframes segArmShake { 0%, 100% { transform: translate(0, 0); } 50% { transform: translate(3px, -2px); } }
 @keyframes segTwitch { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-3px); } }
 @keyframes segDrip { 0% { opacity: 1; transform: translateY(0); } 100% { opacity: 0; transform: translateY(20px); } }
 @keyframes segSparkle { 0% { opacity: 0.5; transform: scale(0.8); } 100% { opacity: 1; transform: scale(1.2); } }
@@ -426,6 +467,20 @@ html, body {
   z-index: 5;
   animation: burstOut 1.2s ease-out forwards;
   opacity: 0;
+}
+
+.arm-projectile {
+  position: absolute;
+  pointer-events: none;
+  z-index: 8;
+  animation: armProjectile var(--duration, 900ms) cubic-bezier(0.16, 0.72, 0.34, 1) forwards;
+  text-shadow: 0 0 10px currentColor;
+}
+
+@keyframes armProjectile {
+  0% { opacity: 1; transform: translate(-50%, -50%) scale(0.5) rotate(0deg); }
+  70% { opacity: 0.95; }
+  100% { opacity: 0; transform: translate(calc(-50% + var(--tx)), calc(-50% + var(--ty))) scale(1.25) rotate(540deg); }
 }
 
 @keyframes burstOut {

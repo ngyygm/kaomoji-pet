@@ -180,6 +180,14 @@ const KAOMOJI_PARTS = {
     fist_r:   ['', ')o'],
     power:    ['ᕙ', 'ᕗ'],
     fight:    ['(ง', 'ง)'],
+    punch:    ['(ง', ')ง'],
+    cast:     ['╰(', ')╯'],
+    toss:     ['(╯', ')╯'],
+    shield:   ['ᕦ(', ')ᕤ'],
+    dance:    ['└(', ')┘'],
+    grabby:   ['ლ(', 'ლ)'],
+    cheer_up: ['٩(', ')و'],
+    wing:     ['ʚ', 'ɞ'],
     // 抱歉/投降
     bow:      ['m(_', '_)m'],
     surrender:['(´', '`)', ],
@@ -256,6 +264,8 @@ const PRESET_EXPRESSIONS = {
   happy_ok:        { eyes: 'happy',   mouth: 'smile',  arms: 'thumbs',bounds: 'paren', deco: 'none' },
   happy_clap:      { eyes: 'happy',   mouth: 'smile',  arms: 'clap',  bounds: 'paren', deco: 'music' },
   happy_yay:       { eyes: 'grin',    mouth: 'grin',   arms: 'cheer3',bounds: 'paren', deco: 'star' },
+  happy_dance:     { eyes: 'happy',   mouth: 'grin',   arms: 'dance', bounds: 'paren', deco: 'note' },
+  happy_launch:    { eyes: 'sparkle', mouth: 'smile',  arms: 'cheer_up', bounds: 'paren', deco: 'sparkle' },
 
   // === 喜爱 ===
   love:            { eyes: 'content', mouth: 'omega',  arms: 'hug',   bounds: 'paren', deco: 'none' },
@@ -264,6 +274,7 @@ const PRESET_EXPRESSIONS = {
   love_big:        { eyes: 'round',   mouth: 'tiny',   arms: 'hug',   bounds: 'paren', deco: 'heart' },
   love_hearts:     { eyes: 'flower',  mouth: 'crescent',arms:'none',  bounds: 'paren', deco: 'none' },
   love_shy:        { eyes: 'dot2',    mouth: 'tiny',   arms: 'none',  bounds: 'paren', deco: 'none' },
+  love_reach:      { eyes: 'content', mouth: 'cat',    arms: 'grabby', bounds: 'paren', deco: 'heart' },
 
   // === 伤心 ===
   sad:             { eyes: 'sad',     mouth: 'frown',  arms: 'none',  bounds: 'paren', deco: 'none' },
@@ -285,6 +296,8 @@ const PRESET_EXPRESSIONS = {
   angry_point:     { eyes: 'glare',   mouth: 'rage',   arms: 'grab2', bounds: 'paren', deco: 'none' },
   angry_flip:      { eyes: 'shock',   mouth: 'rage',   arms: 'flip',  bounds: 'paren', deco: 'none' },
   angry_fight:     { eyes: 'glare',   mouth: 'rage',   arms: 'fight', bounds: 'paren', deco: 'none' },
+  angry_punch:     { eyes: 'rage',    mouth: 'scream', arms: 'punch', bounds: 'paren', deco: 'fire' },
+  angry_throw:     { eyes: 'furious', mouth: 'rage',   arms: 'toss',  bounds: 'paren', deco: 'none' },
 
   // === 惊讶 ===
   surprised:       { eyes: 'wide',    mouth: 'open',   arms: 'none',  bounds: 'paren', deco: 'none' },
@@ -292,6 +305,7 @@ const PRESET_EXPRESSIONS = {
   surprised_star:  { eyes: 'star',    mouth: 'open',   arms: 'none',  bounds: 'paren', deco: 'sparkle' },
   shocked_big:     { eyes: 'wide',    mouth: 'scream', arms: 'spread',bounds: 'paren', deco: 'none' },
   surprised_what:  { eyes: 'shock',   mouth: 'down',   arms: 'none',  bounds: 'paren', deco: 'none' },
+  surprised_shield:{ eyes: 'wide',    mouth: 'open',   arms: 'shield',bounds: 'paren', deco: 'sparkle' },
 
   // === 可爱/卖萌 ===
   cute:            { eyes: 'dot',     mouth: 'omega',  arms: 'none',  bounds: 'paren', deco: 'none' },
@@ -304,6 +318,7 @@ const PRESET_EXPRESSIONS = {
   cute_bloom:      { eyes: 'flower',  mouth: 'tiny',   arms: 'none',  bounds: 'paren', deco: 'flower' },
   cute_star:       { eyes: 'sparkle', mouth: 'tiny',   arms: 'none',  bounds: 'paren', deco: 'star' },
   cute_dote:       { eyes: 'baby',    mouth: 'cat',    arms: 'none',  bounds: 'paren', deco: 'none' },
+  cute_flap:       { eyes: 'cute',    mouth: 'tiny',   arms: 'wing',  bounds: 'paren', deco: 'sparkle' },
 
   // === 眨眼 ===
   wink:            { eyes: 'wink_r',  mouth: 'omega',  arms: 'none',  bounds: 'paren', deco: 'none' },
@@ -335,17 +350,17 @@ const PRESET_EXPRESSIONS = {
  * 每个心情对应多个预设，运行时随机选一个
  */
 const MOOD_PRESETS = {
-  happy:      ['happy_cheer', 'happy_smile', 'happy_big', 'happy_excited', 'happy_v'],
-  love:       ['love', 'love_eyes', 'love_hug', 'love_big', 'love_hearts'],
+  happy:      ['happy_cheer', 'happy_smile', 'happy_big', 'happy_excited', 'happy_v', 'happy_dance', 'happy_launch'],
+  love:       ['love', 'love_eyes', 'love_hug', 'love_big', 'love_hearts', 'love_reach'],
   sad:        ['sad_cry', 'sad', 'sad_cry2', 'sad_tears', 'sad_sigh'],
-  angry:      ['angry', 'angry_rage', 'angry_yell', 'angry_furious', 'angry_fight'],
-  surprised:  ['surprised', 'shocked', 'surprised_star', 'shocked_big'],
-  playing:    ['wink_playful', 'happy_cheer', 'happy_ok', 'wink_wave'],
+  angry:      ['angry', 'angry_rage', 'angry_yell', 'angry_furious', 'angry_fight', 'angry_punch', 'angry_throw'],
+  surprised:  ['surprised', 'shocked', 'surprised_star', 'shocked_big', 'surprised_shield'],
+  playing:    ['wink_playful', 'happy_cheer', 'happy_ok', 'wink_wave', 'happy_dance', 'cute_flap'],
   hungry:     ['cute_cat', 'sad_down', 'cute'],
   sleepy:     ['sleepy', 'drowsy'],
   sleeping:   ['sleeping'],
   normal:     ['neutral', 'normal'],
-  greeting:   ['happy_wave', 'happy_v', 'happy_smile', 'happy_yay'],
+  greeting:   ['happy_wave', 'happy_v', 'happy_smile', 'happy_yay', 'happy_launch'],
   satisfied:  ['happy_cute', 'smug', 'happy_smile'],
   curious:    ['curious', 'confused', 'cute_cat'],
   alert:      ['surprised', 'surprised_what'],

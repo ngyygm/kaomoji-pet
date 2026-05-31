@@ -1,0 +1,30 @@
+{
+  "id": "giant",
+  "name": "随机大脸",
+  "emoji": "😱",
+  "order": 30,
+  "version": "1.0.0",
+  "description": "全屏随机巨大颜文字。",
+  "entry": "index.html",
+  "startChannel": "show-giant",
+  "duration": 4000,
+  "closeBufferMs": 0,
+  "window": {
+    "type": "fullscreen-transparent",
+    "clickThrough": true,
+    "focusable": false,
+    "alwaysOnTop": true
+  },
+  "pet": {
+    "animation": "surprised",
+    "animationDuration": 3000,
+    "particles": null
+  },
+  "params": {
+    "duration": { "type": "number", "default": 4000 },
+    "mode": { "type": "string", "default": null },
+    "kaomoji": { "type": "string", "default": null },
+    "color": { "type": "string", "default": null }
+  },
+  "enabled": true
+}

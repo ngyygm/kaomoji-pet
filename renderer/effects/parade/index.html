@@ -1,0 +1,559 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <title> </title>
+  <style>
+    * { margin: 0; padding: 0; user-select: none; }
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: transparent;
+      border: none;
+      outline: none;
+    }
+    #parade-container {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+    }
+    .marcher {
+      position: absolute;
+      font-family: "Segoe UI Emoji", "Apple Color Emoji", sans-serif;
+      white-space: nowrap;
+      pointer-events: none;
+      will-change: transform;
+      transition: none;
+    }
+    .flag-symbol {
+      position: absolute;
+      font-size: 18px;
+      pointer-events: none;
+    }
+    .flag-symbol .flag-inner {
+      display: inline-block;
+      animation: flagWave 0.6s ease-in-out infinite alternate;
+    }
+    @keyframes flagWave {
+      0% { transform: translateX(-6px) rotate(-10deg); }
+      100% { transform: translateX(6px) rotate(10deg); }
+    }
+    .dust-particle {
+      position: absolute;
+      border-radius: 50%;
+      pointer-events: none;
+      animation: dustFade 0.5s ease-out forwards;
+    }
+    @keyframes dustFade {
+      0% { opacity: 0.5; transform: scale(1); }
+      100% { opacity: 0; transform: scale(0.2) translateY(-8px); }
+    }
+    .music-note {
+      position: absolute;
+      pointer-events: none;
+      animation: noteFloat 1.2s ease-out forwards;
+      font-size: 18px;
+      opacity: 0;
+    }
+    @keyframes noteFloat {
+      0% { opacity: 0.7; transform: translate(0, 0) scale(0.6); }
+      60% { opacity: 0.5; }
+      100% { opacity: 0; transform: translate(var(--note-tx), -60px) scale(1.2); }
+    }
+    .panic-mark {
+      position: absolute;
+      pointer-events: none;
+      font-size: 22px;
+      font-weight: bold;
+      animation: panicPop 0.6s ease-out forwards;
+      color: #fbbf24;
+      text-shadow: 0 0 8px rgba(251, 191, 36, 0.6);
+    }
+    @keyframes panicPop {
+      0% { opacity: 0; transform: scale(0.3); }
+      30% { opacity: 1; transform: scale(1.3); }
+      100% { opacity: 0; transform: scale(0.8) translateY(-20px); }
+    }
+    .bump-shake {
+      animation: bumpShake 300ms ease-out !important;
+    }
+    @keyframes bumpShake {
+      0%, 100% { margin-left: 0; }
+      15% { margin-left: -6px; }
+      30% { margin-left: 6px; }
+      45% { margin-left: -4px; }
+      60% { margin-left: 4px; }
+      75% { margin-left: -2px; }
+    }
+    .bump-exclaim {
+      position: absolute;
+      pointer-events: none;
+      font-size: 20px;
+      font-weight: bold;
+      color: #f87171;
+      text-shadow: 0 0 6px rgba(248, 113, 113, 0.6);
+      animation: exclaimPop 0.5s ease-out forwards;
+    }
+    @keyframes exclaimPop {
+      0% { opacity: 0; transform: scale(0.2); }
+      20% { opacity: 1; transform: scale(1.4); }
+      100% { opacity: 0; transform: scale(0.8) translateY(-15px); }
+    }
+    #parade-container.fade-out {
+      animation: fadeOutAll 500ms ease-out forwards;
+    }
+    @keyframes fadeOutAll {
+      from { opacity: 1; }
+      to { opacity: 0; }
+    }
+  </style>
+</head>
+<body>
+  <div id="parade-container"></div>
+  <script>
+    const { ipcRenderer } = require('electron');
+
+    const COLOR_PALETTES = [
+      // Pastel
+      ['#f9a8d4', '#818cf8', '#f87171', '#86efac', '#fde68a', '#93c5fd', '#c084fc', '#fb923c'],
+      // Ocean
+      ['#67e8f9', '#93c5fd', '#a78bfa', '#818cf8', '#6ee7b7', '#5eead4', '#7dd3fc', '#c4b5fd'],
+      // Sunset
+      ['#fb923c', '#f87171', '#fbbf24', '#f472b6', '#e879f9', '#f9a8d4', '#fdba74', '#fca5a5'],
+      // Forest
+      ['#86efac', '#a3e635', '#4ade80', '#34d399', '#fde68a', '#bef264', '#d9f99d', '#bbf7d0'],
+      // Neon
+      ['#e879f9', '#c084fc', '#818cf8', '#f472b6', '#fb923c', '#a78bfa', '#f9a8d4', '#67e8f9'],
+    ];
+
+    const KAOMOJI_POOL = [
+      '(=^・ω・^=)', '(=①ω①=)', '(=ｪ´=)', 'ฅ•̀∀•́ฅ',
+      '(✪ω✪)', '(=￣ω￣=)', 'U•ェ•*U', '⊂(ο･㉨･ο)⊃',
+      '(Θ３Θ)', '(*ΦωΦ*)', '(✧◡✧)', '(￣(∞)￣)',
+      '(=^･･^=)', '(*^▽^*)', '(ꈍᴗꈍ)', '(=^𖥦^=)',
+      "(●'ω')旦", '(=ｪ´=)ゞ', 'Σ(っ°Д°;)っ', '凸ˋ_ˊ#',
+      '(ง •_•)ง', 'ψ(｀∇´)ψ', '(▼ヘ▼#)', 'o(≧口≦)o',
+      '(•́へ•́╬)', '(ꈍᴗꈍ)', 'ᕙ༼ ͝°益° ༽ᕗ'
+    ];
+
+    // Roles
+    const ROLE_LEADER = 'leader';
+    const ROLE_FLAG_BEARER = 'flag_bearer';
+    const ROLE_STRAGGLER = 'straggler';
+    const ROLE_CONFUSED = 'confused';
+    const ROLE_REGULAR = 'regular';
+
+    const MARCH_FREQUENCY = 8;
+
+    // Formation shapes
+    const FORMATIONS = ['grid', 'wedge', 'diagonal', 'scattered', 'block', 'wide'];
+
+    function pick(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+    function rand(min, max) { return min + Math.random() * (max - min); }
+
+    ipcRenderer.on('show-parade', (event, data) => {
+      const duration = (data && data.duration) || 16000;
+      startParade(duration);
+    });
+
+    function startParade(duration) {
+      const container = document.getElementById('parade-container');
+      const screenWidth = window.innerWidth;
+      const screenHeight = window.innerHeight;
+
+      // === Randomization ===
+      // Direction: left-to-right or right-to-left
+      const goRight = Math.random() > 0.5;
+      const formationWidth = screenWidth * rand(0.78, 0.92);
+      const formationHeight = screenHeight * rand(0.62, 0.82);
+      const baseY = screenHeight * rand(0.06, 0.12);
+      // Formation shape
+      const formation = pick(FORMATIONS);
+      // Color palette
+      const palette = pick(COLOR_PALETTES);
+      // 9×10 main formation
+      const ROWS = 10;
+      const COLS = 9;
+      const ROW_SPACING = formationHeight / (ROWS - 1);
+      const COL_SPACING = formationWidth / (COLS - 1);
+      // March speed variation
+      const marchFreq = rand(3.2, 5.4);
+      const baseAmplitude = rand(5, 11);
+      const baseFontSize = Math.min(42, Math.max(24, formationWidth / COLS * rand(0.42, 0.58)));
+      const leaderFontSize = baseFontSize + rand(8, 16);
+      // Flag symbols
+      const flagSymbols = ['♡', '★', '✧', '♪', '✿', '☆', '❁', '♫'];
+
+      // Pick unique kaomoji and shuffle
+      const shuffled = [...KAOMOJI_POOL].sort(() => Math.random() - 0.5);
+      const total = ROWS * COLS; // 90
+      const picked = [];
+      for (let i = 0; i < total; i++) {
+        picked.push(shuffled[i % shuffled.length]);
+      }
+
+      // Assign roles randomly (pick random positions for special roles)
+      const allPositions = [];
+      for (let r = 0; r < ROWS; r++) {
+        for (let c = 0; c < COLS && allPositions.length < total; c++) {
+          allPositions.push({ r, c });
+        }
+      }
+      const shuffledPos = [...allPositions].sort(() => Math.random() - 0.5);
+      const roleMap = {};
+      let posIdx = 0;
+      // Leader: front row random column
+      roleMap[`${shuffledPos[posIdx].r},${shuffledPos[posIdx].c}`] = ROLE_LEADER;
+      posIdx++;
+      // Flag bearers: 3-4 random positions
+      const numFlagBearers = Math.floor(rand(6, 10));
+      for (let i = 0; i < numFlagBearers; i++) {
+        roleMap[`${shuffledPos[posIdx].r},${shuffledPos[posIdx].c}`] = ROLE_FLAG_BEARER;
+        posIdx++;
+      }
+      // Stragglers: 2-3 random positions
+      const numStragglers = Math.floor(rand(5, 8));
+      for (let i = 0; i < numStragglers; i++) {
+        roleMap[`${shuffledPos[posIdx].r},${shuffledPos[posIdx].c}`] = ROLE_STRAGGLER;
+        posIdx++;
+      }
+      // Confused: 2-3 random positions
+      const numConfused = Math.floor(rand(5, 8));
+      for (let i = 0; i < numConfused; i++) {
+        roleMap[`${shuffledPos[posIdx].r},${shuffledPos[posIdx].c}`] = ROLE_CONFUSED;
+        posIdx++;
+      }
+
+      // Compute grid positions based on formation
+      function getGridPos(r, c) {
+        let gx = c * COL_SPACING;
+        let gy = baseY + r * ROW_SPACING;
+        if (formation === 'wedge') {
+          // V-formation: rows fan out from center
+          const halfCols = (COLS - 1) / 2;
+          gx = (c - halfCols) * COL_SPACING * 1.1;
+          gy = baseY + (Math.abs(c - halfCols) + r) * ROW_SPACING * 0.7;
+        } else if (formation === 'diagonal') {
+          // Diagonal lines going down-right
+          gx = c * COL_SPACING + r * 35;
+          gy = baseY + r * ROW_SPACING;
+        } else if (formation === 'scattered') {
+          // Slightly randomized positions around grid
+          gx = c * COL_SPACING + rand(-15, 15);
+          gy = baseY + r * ROW_SPACING + rand(-8, 8);
+        } else if (formation === 'block') {
+          gx = c * COL_SPACING + (r % 2) * COL_SPACING * 0.18;
+          gy = baseY + r * ROW_SPACING;
+        } else if (formation === 'wide') {
+          gx = c * COL_SPACING * 0.9;
+          gy = baseY + r * ROW_SPACING * 1.25 + Math.sin(c * 0.7) * 8;
+        }
+        return { gx, gy };
+      }
+
+      // Build marcher objects
+      const marchers = [];
+      for (let r = 0; r < ROWS; r++) {
+        for (let c = 0; c < COLS && marchers.length < total; c++) {
+          const idx = r * COLS + c;
+          const roleKey = `${r},${c}`;
+          const role = roleMap[roleKey] || ROLE_REGULAR;
+          const color = palette[(idx + r + Math.floor(c / 2)) % palette.length];
+          let fontSize = baseFontSize + rand(-3, 3);
+          if (role === ROLE_LEADER) fontSize = leaderFontSize;
+
+          const { gx, gy } = getGridPos(r, c);
+
+          const el = document.createElement('div');
+          el.className = 'marcher';
+          el.textContent = picked[idx];
+          el.style.fontSize = fontSize + 'px';
+          el.style.color = color;
+          el.style.textShadow = `0 0 15px ${color}`;
+          el.style.opacity = '0';
+          // Random slight rotation for personality
+          if (role === ROLE_REGULAR) {
+            el.style.transform = `rotate(${rand(-3, 3)}deg)`;
+          }
+          container.appendChild(el);
+
+          // Flag element for flag bearers
+          let flagEl = null;
+          if (role === ROLE_FLAG_BEARER) {
+            flagEl = document.createElement('div');
+            flagEl.className = 'flag-symbol';
+            const flagInner = document.createElement('span');
+            flagInner.className = 'flag-inner';
+            flagInner.textContent = pick(flagSymbols);
+            flagEl.appendChild(flagInner);
+            flagEl.style.color = color;
+            flagEl.style.textShadow = `0 0 10px ${color}`;
+            flagEl.style.opacity = '0';
+            container.appendChild(flagEl);
+          }
+
+          marchers.push({
+            el,
+            flagEl,
+            row: r,
+            col: c,
+            role,
+            color,
+            fontSize,
+            gridX: gx,
+            gridY: gy,
+            enterDelay: idx * rand(8, 22),
+            // Random individual march offset for organic feel
+            marchPhase: rand(0, Math.PI * 2),
+            amplitude: baseAmplitude + rand(-2, 3),
+            // State for special roles
+            stragglerPanicked: false,
+            stragglerPanicShown: false,
+            confusedBumped: false,
+            confusedBumpShown: false,
+          });
+        }
+      }
+
+      // === Honor Guard (仪仗队): 4 soldiers in 1+3 pattern, leading the parade ===
+      const honorGuardGap = 90 + rand(20, 60);
+      const hgSpread = COL_SPACING * 1.5;
+      const hgCenterX = goRight ? (formationWidth + honorGuardGap) : -honorGuardGap;
+      const hgCenterY = baseY + (ROWS - 1) * ROW_SPACING / 2;
+      const hgPositions = [
+        // Row 0: 1 soldier centered
+        { gx: hgCenterX, gy: hgCenterY - ROW_SPACING * 0.6 },
+        // Row 1: 3 soldiers spread
+        { gx: hgCenterX - hgSpread, gy: hgCenterY + ROW_SPACING * 0.4 },
+        { gx: hgCenterX, gy: hgCenterY + ROW_SPACING * 0.4 },
+        { gx: hgCenterX + hgSpread, gy: hgCenterY + ROW_SPACING * 0.4 },
+      ];
+      const hgColors = ['#fde68a', '#fbbf24', '#f59e0b', '#fcd34d'];
+      const hgTexts = ['ฅ•̀∀•́ฅ', '(ง •_•)ง', 'ψ(｀∇´)ψ', '(=^・ω・^=)'];
+      for (let i = 0; i < 4; i++) {
+        const el = document.createElement('div');
+        el.className = 'marcher';
+        el.textContent = hgTexts[i];
+        el.style.fontSize = (leaderFontSize + 4) + 'px';
+        el.style.color = hgColors[i];
+        el.style.textShadow = `0 0 18px ${hgColors[i]}`;
+        el.style.opacity = '0';
+        el.style.fontWeight = 'bold';
+        container.appendChild(el);
+        marchers.push({
+          el,
+          flagEl: null,
+          row: -1,
+          col: i,
+          role: 'honor_guard',
+          color: hgColors[i],
+          fontSize: leaderFontSize + 4,
+          gridX: hgPositions[i].gx,
+          gridY: hgPositions[i].gy,
+          enterDelay: i * rand(5, 15),
+          marchPhase: rand(0, Math.PI * 2),
+          amplitude: baseAmplitude + 4,
+          stragglerPanicked: false,
+          stragglerPanicShown: false,
+          confusedBumped: false,
+          confusedBumpShown: false,
+        });
+      }
+
+      // Direction-dependent start/end (account for honor guard width)
+      const totalFormationWidth = formationWidth + honorGuardGap + hgSpread * 2;
+      const travelPad = totalFormationWidth + 220;
+      const startX = goRight ? -travelPad : (screenWidth + travelPad);
+      const endX = goRight ? (screenWidth + 160) : -(totalFormationWidth + 160);
+
+      let startTime = null;
+      let animDone = false;
+      let dustTimer = 0;
+      let noteTimer = 0;
+
+      // Find references to special marchers (now multiple of each)
+      const stragglers = marchers.filter(m => m.role === ROLE_STRAGGLER);
+      const confusedMarchers = marchers.filter(m => m.role === ROLE_CONFUSED);
+      // Find marchers directly above each confused one (for bump interaction)
+      const aboveConfusedMap = new Map();
+      confusedMarchers.forEach(cm => {
+        const above = marchers.find(m => m.row === cm.row - 1 && m.col === cm.col);
+        if (above) aboveConfusedMap.set(cm, above);
+      });
+
+      function spawnDust(x, y, color) {
+        const dust = document.createElement('div');
+        dust.className = 'dust-particle';
+        const size = 3 + Math.random() * 3;
+        dust.style.width = size + 'px';
+        dust.style.height = size + 'px';
+        dust.style.left = (x - size / 2) + 'px';
+        dust.style.top = (y - size / 2) + 'px';
+        dust.style.background = color;
+        dust.style.opacity = '0.4';
+        container.appendChild(dust);
+        setTimeout(() => dust.remove(), 500);
+      }
+
+      function spawnMusicNote(x, y, color) {
+        const note = document.createElement('div');
+        note.className = 'music-note';
+        const notes = ['♪', '♫', '♬'];
+        note.textContent = notes[Math.floor(Math.random() * notes.length)];
+        note.style.left = x + 'px';
+        note.style.top = y + 'px';
+        note.style.color = color;
+        note.style.textShadow = `0 0 8px ${color}`;
+        note.style.setProperty('--note-tx', (Math.random() * 20 - 10) + 'px');
+        container.appendChild(note);
+        setTimeout(() => note.remove(), 1200);
+      }
+
+      function spawnPanicMark(x, y) {
+        const mark = document.createElement('div');
+        mark.className = 'panic-mark';
+        mark.textContent = '!!!';
+        mark.style.left = x + 'px';
+        mark.style.top = y + 'px';
+        container.appendChild(mark);
+        setTimeout(() => mark.remove(), 600);
+      }
+
+      function spawnBumpExclaim(x, y) {
+        const ex = document.createElement('div');
+        ex.className = 'bump-exclaim';
+        ex.textContent = '!';
+        ex.style.left = x + 'px';
+        ex.style.top = y + 'px';
+        container.appendChild(ex);
+        setTimeout(() => ex.remove(), 500);
+      }
+
+      function getMarcherPosition(marcher, baseX, progress, time) {
+        let offsetX = 0;
+        let offsetY = 0;
+
+        // Leader is slightly ahead (in the direction of travel)
+        if (marcher.role === ROLE_LEADER) {
+          offsetX = goRight ? -30 : 30;
+          marcher.amplitude = baseAmplitude + 6;
+        }
+
+        // Vertical bob with individual phase
+        const bob = Math.sin(time * marchFreq + marcher.marchPhase) * marcher.amplitude;
+
+        let finalX = baseX + marcher.gridX + offsetX;
+        let finalY = marcher.gridY + bob + offsetY;
+
+        // Direction-aware offsets for straggler/confused
+        const dirSign = goRight ? -1 : 1; // "behind" direction
+
+        // Straggler behavior
+        if (marcher.role === ROLE_STRAGGLER) {
+          const fallDist = rand(100, 170);
+          if (progress < 0.3) {
+            // Normal march
+          } else if (progress < 0.6) {
+            const slowPhase = (progress - 0.3) / 0.3;
+            finalX += dirSign * slowPhase * fallDist;
+          } else if (progress < 0.65) {
+            marcher.stragglerPanicked = true;
+            const sprintPhase = (progress - 0.6) / 0.05;
+            finalX += dirSign * (fallDist - sprintPhase * (fallDist + 30));
+          } else if (progress < 0.75) {
+            const settlePhase = (progress - 0.65) / 0.1;
+            finalX += -dirSign * (30 - settlePhase * 30);
+          }
+        }
+
+        // Confused behavior
+        if (marcher.role === ROLE_CONFUSED) {
+          if (progress > 0.25 && progress < 0.4) {
+            const driftPhase = (progress - 0.25) / 0.15;
+            finalY -= driftPhase * ROW_SPACING;
+          } else if (progress >= 0.4 && progress < 0.42) {
+            finalY -= ROW_SPACING;
+            if (!marcher.confusedBumped) {
+              marcher.confusedBumped = true;
+            }
+          } else if (progress >= 0.42 && progress < 0.5) {
+            const wobblePhase = (progress - 0.42) / 0.08;
+            const remaining = (1 - wobblePhase) * ROW_SPACING;
+            finalY -= remaining * (1 - wobblePhase);
+            finalX += Math.sin(time * 20) * 5 * (1 - wobblePhase);
+          }
+        }
+
+        return { x: finalX, y: finalY };
+      }
+
+      function animate(timestamp) {
+        if (!startTime) startTime = timestamp;
+        const elapsed = timestamp - startTime;
+        const progress = Math.min(elapsed / duration, 1);
+        const timeSeconds = elapsed / 1000;
+
+        const baseX = startX + progress * (endX - startX);
+
+        dustTimer += 1;
+        noteTimer += 1;
+
+        marchers.forEach(marcher => {
+          const visible = elapsed >= marcher.enterDelay;
+          if (!visible) return;
+
+          const localElapsed = elapsed - marcher.enterDelay;
+          const fadeIn = Math.min(localElapsed / 300, 1);
+
+          const pos = getMarcherPosition(marcher, baseX, progress, timeSeconds);
+
+          marcher.el.style.transform = `translate(${pos.x}px, ${pos.y}px)`;
+          marcher.el.style.opacity = fadeIn;
+
+          if (marcher.flagEl) {
+            marcher.flagEl.style.transform = `translate(${pos.x + marcher.fontSize * 0.3}px, ${pos.y - 22}px)`;
+            marcher.flagEl.style.opacity = fadeIn;
+          }
+
+          if (dustTimer % 8 === 0 && progress < 0.95 && (marcher.row + marcher.col) % 3 === dustTimer % 3) {
+            spawnDust(pos.x + marcher.fontSize * 0.4, pos.y + marcher.fontSize * 0.8, marcher.color);
+          }
+
+          if (noteTimer % 60 === 0 && Math.random() < 0.15 && progress > 0.05 && progress < 0.9 && marcher.row === 0 && marcher.col % 3 === 0) {
+            spawnMusicNote(pos.x + marcher.fontSize * 0.3, pos.y - 10, marcher.color);
+          }
+
+          if (marcher.role === ROLE_STRAGGLER && marcher.stragglerPanicked && !marcher.stragglerPanicShown) {
+            marcher.stragglerPanicShown = true;
+            spawnPanicMark(pos.x + marcher.fontSize * 0.3, pos.y - 12);
+          }
+
+          if (marcher.role === ROLE_CONFUSED && marcher.confusedBumped && !marcher.confusedBumpShown) {
+            marcher.confusedBumpShown = true;
+            spawnBumpExclaim(pos.x + marcher.fontSize * 0.4, pos.y - 10);
+            marcher.el.classList.add('bump-shake');
+            setTimeout(() => marcher.el.classList.remove('bump-shake'), 300);
+            const aboveM = aboveConfusedMap.get(marcher);
+            if (aboveM) {
+              aboveM.el.classList.add('bump-shake');
+              setTimeout(() => aboveM.el.classList.remove('bump-shake'), 300);
+            }
+          }
+        });
+
+        if (progress < 1 && !animDone) {
+          requestAnimationFrame(animate);
+        } else {
+          animDone = true;
+          container.classList.add('fade-out');
+          setTimeout(() => window.close(), 500);
+        }
+      }
+
+      requestAnimationFrame(animate);
+    }
+  </script>
+</body>
+</html>

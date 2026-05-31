@@ -1,0 +1,461 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <title> </title>
+  <style>
+    * { margin: 0; padding: 0; user-select: none; }
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: transparent;
+      border: none;
+      outline: none;
+    }
+    #giant {
+      width: 100%;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 250px;
+      font-family: "Segoe UI Emoji", "Apple Color Emoji", sans-serif;
+      color: rgba(255, 200, 230, 0.7);
+      text-shadow: 0 0 60px rgba(249, 168, 212, 0.5);
+      white-space: nowrap;
+    }
+
+    /* === Billiard mode: positioned absolutely, JS-driven physics === */
+    #billiard {
+      position: absolute;
+      font-size: 150px;
+      font-family: "Segoe UI Emoji", "Apple Color Emoji", sans-serif;
+      white-space: nowrap;
+      pointer-events: none;
+      will-change: transform;
+      text-shadow: 0 0 50px currentColor;
+    }
+    #billiard .dizzy-eye {
+      display: inline-block;
+      animation: eyeSpin 0.3s linear infinite;
+    }
+    @keyframes eyeSpin {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+    .billiard-trail {
+      position: absolute;
+      pointer-events: none;
+      font-family: "Segoe UI Emoji", "Apple Color Emoji", sans-serif;
+      white-space: nowrap;
+      animation: trailFade 0.6s ease-out forwards;
+    }
+    @keyframes trailFade {
+      from { opacity: 0.4; transform: scale(0.8); }
+      to { opacity: 0; transform: scale(0.3); }
+    }
+    .billiard-spark {
+      position: absolute;
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      pointer-events: none;
+      animation: sparkBurst 0.5s ease-out forwards;
+    }
+    @keyframes sparkBurst {
+      from { opacity: 1; transform: scale(1); }
+      to { opacity: 0; transform: scale(0); }
+    }
+
+    /* === Appear animations === */
+    .appear-pop {
+      animation: appearPop 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+      opacity: 0; transform: scale(0);
+    }
+    @keyframes appearPop {
+      0% { opacity: 0; transform: scale(0) rotate(-10deg); }
+      60% { opacity: 1; transform: scale(1.15) rotate(3deg); }
+      100% { opacity: 1; transform: scale(1) rotate(0deg); }
+    }
+
+    .appear-spin {
+      animation: appearSpin 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+      opacity: 0; transform: scale(0) rotate(-720deg);
+    }
+    @keyframes appearSpin {
+      0% { opacity: 0; transform: scale(0) rotate(-720deg); }
+      100% { opacity: 1; transform: scale(1) rotate(0deg); }
+    }
+
+    .appear-bounce {
+      animation: appearBounce 0.8s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+      opacity: 0; transform: translateY(-100vh);
+    }
+    @keyframes appearBounce {
+      0% { opacity: 0; transform: translateY(-100vh) scale(0.5); }
+      50% { opacity: 1; transform: translateY(20px) scale(1.1); }
+      70% { transform: translateY(-10px) scale(0.95); }
+      100% { opacity: 1; transform: translateY(0) scale(1); }
+    }
+
+    .appear-shake {
+      animation: appearShake 0.6s ease-out forwards;
+      opacity: 0; transform: scale(0);
+    }
+    @keyframes appearShake {
+      0% { opacity: 0; transform: scale(0); }
+      20% { opacity: 1; transform: scale(1.2) translateX(-20px); }
+      40% { transform: scale(0.9) translateX(20px); }
+      60% { transform: scale(1.1) translateX(-10px); }
+      80% { transform: scale(0.95) translateX(10px); }
+      100% { opacity: 1; transform: scale(1) translateX(0); }
+    }
+
+    .appear-left {
+      animation: appearLeft 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+      opacity: 0; transform: translateX(-100vw) scaleX(0.5);
+    }
+    @keyframes appearLeft {
+      0% { opacity: 0; transform: translateX(-100vw) scaleX(0.5); }
+      100% { opacity: 1; transform: translateX(0) scaleX(1); }
+    }
+
+    /* === Idle animations === */
+    .idle-wobble { animation: idleWobble 0.8s ease-in-out infinite alternate; }
+    @keyframes idleWobble {
+      0% { transform: rotate(-5deg) scale(1); }
+      100% { transform: rotate(5deg) scale(1.05); }
+    }
+
+    .idle-pulse { animation: idlePulse 0.6s ease-in-out infinite alternate; }
+    @keyframes idlePulse {
+      0% { transform: scale(1); }
+      100% { transform: scale(1.08); }
+    }
+
+    .idle-shake { animation: idleShake 0.15s ease-in-out infinite; }
+    @keyframes idleShake {
+      0%, 100% { transform: translateX(0); }
+      25% { transform: translateX(-8px) rotate(-2deg); }
+      75% { transform: translateX(8px) rotate(2deg); }
+    }
+
+    .idle-jelly { animation: idleJelly 0.7s ease-in-out infinite; }
+    @keyframes idleJelly {
+      0%, 100% { transform: scale(1, 1); }
+      25% { transform: scale(0.95, 1.05); }
+      50% { transform: scale(1.05, 0.95); }
+      75% { transform: scale(0.98, 1.02); }
+    }
+
+    .idle-spin { animation: idleSpin 2s linear infinite; }
+    @keyframes idleSpin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
+    /* === Exit animations === */
+    .exit-zoom { animation: exitZoom 0.6s ease-in forwards; }
+    @keyframes exitZoom {
+      0% { opacity: 1; transform: scale(1); }
+      100% { opacity: 0; transform: scale(2); }
+    }
+
+    .exit-shrink { animation: exitShrink 0.5s ease-in forwards; }
+    @keyframes exitShrink {
+      0% { opacity: 1; transform: scale(1); }
+      100% { opacity: 0; transform: scale(0); }
+    }
+
+    .exit-fall { animation: exitFall 0.7s ease-in forwards; }
+    @keyframes exitFall {
+      0% { opacity: 1; transform: translateY(0) rotate(0deg); }
+      100% { opacity: 0; transform: translateY(100vh) rotate(45deg); }
+    }
+
+    .exit-spin-out { animation: exitSpinOut 0.6s ease-in forwards; }
+    @keyframes exitSpinOut {
+      0% { opacity: 1; transform: scale(1) rotate(0deg); }
+      100% { opacity: 0; transform: scale(0) rotate(720deg); }
+    }
+
+    .exit-split { animation: exitSplit 0.5s ease-in forwards; }
+    @keyframes exitSplit {
+      0% { opacity: 1; transform: scale(1); }
+      100% { opacity: 0; transform: scaleX(2.5) scaleY(0.1); }
+    }
+
+    .egg-particle {
+      position: absolute;
+      pointer-events: none;
+      animation: eggFloat 1.8s ease-out forwards;
+      opacity: 0;
+      font-size: 40px;
+    }
+    @keyframes eggFloat {
+      0% { opacity: 1; transform: translate(0, 0) scale(0.3); }
+      30% { opacity: 1; }
+      100% { opacity: 0; transform: translate(var(--tx), var(--ty)) scale(1.5); }
+    }
+
+    /* === Rainbow cycling === */
+    .rainbow {
+      background: linear-gradient(90deg,
+        #f9a8d4, #818cf8, #67e8f9, #86efac, #fde68a,
+        #fb923c, #f87171, #e879f9, #f9a8d4);
+      background-size: 200% 100%;
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      animation: rainbowSlide 1.2s linear infinite;
+    }
+    @keyframes rainbowSlide {
+      0% { background-position: 0% 50%; }
+      100% { background-position: 200% 50%; }
+    }
+  </style>
+</head>
+<body>
+  <div id="giant"></div>
+  <script>
+    const { ipcRenderer } = require('electron');
+
+    const KAOMOJI_POOL = [
+      '(=^・ω・^=)', '(=①ω①=)', '(=ｪ´=)', 'ฅ•̀∀•́ฅ',
+      '(✪ω✪)', '(=￣ω￣=)', '(●\'ω\')旦', 'U•ェ•*U',
+      '⊂(ο･㉨･ο)⊃', '(Θ３Θ)', '(=ｪ´=)ゞ', '(*ΦωΦ*)',
+      '(✧◡✧)', 'ヾ(⌐ ■_■)', '(￣(∞)￣)', '(=^･･^=)',
+      'ᕙ༼ ͝°益° ༽ᕗ', '(•́へ•́╬)', '凸(｀0´)凸', '(ง •_•)ง',
+      'ψ(｀∇´)ψ', 'o(≧口≦)o', '(▼ヘ▼#)', 'Σ(っ°Д°;)っ',
+      '(*^▽^*)', '(╥╯^╰╥)', '凸ˋ_ˊ#', '(=^・x・^=)',
+      '(ꈍᴗꈍ)', '(=^𖥦^=)',
+    ];
+
+    const COLORS = [
+      '#f9a8d4', '#818cf8', '#f87171', '#86efac', '#fde68a',
+      '#93c5fd', '#c084fc', '#fb923c', '#f472b6', '#a3e635',
+      '#e879f9', '#67e8f9', '#fbbf24', '#34d399', '#f97316',
+    ];
+
+    const APPEARS = ['appear-pop', 'appear-spin', 'appear-bounce', 'appear-shake', 'appear-left'];
+    const IDLES = ['idle-wobble', 'idle-pulse', 'idle-shake', 'idle-jelly', 'idle-spin', ''];
+    const EXITS = ['exit-zoom', 'exit-shrink', 'exit-fall', 'exit-spin-out', 'exit-split'];
+    const MODES = ['normal', 'billiard']; // 20% billiard
+
+    const SYMBOLS = ['♡', '✧', '★', '✦', '♥', '♪', '☆', '✿', '❁', '⚡', '🔥', '💫', '✺', '❖', '♫'];
+
+    function pick(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+    let billiardRaf = null;
+
+    // === Billiard bouncing mode ===
+    function startBilliard(km, duration) {
+      const el = document.getElementById('giant');
+      el.style.display = 'none';
+
+      // Create billiard element with dizzy @ eyes
+      const ball = document.createElement('div');
+      ball.id = 'billiard';
+      ball.innerHTML = '(<span class="dizzy-eye">@</span>ω<span class="dizzy-eye">@</span>)';
+      document.body.appendChild(ball);
+
+      const W = window.innerWidth;
+      const H = window.innerHeight;
+      const size = 200; // approximate bounding box of the text
+      const halfW = size / 2;
+      const halfH = size / 2;
+
+      // Start from center
+      let x = W / 2;
+      let y = H / 2;
+
+      // Random launch direction, high speed
+      const launchAngle = Math.random() * Math.PI * 2;
+      const speed = 18 + Math.random() * 10; // px per frame
+      let vx = Math.cos(launchAngle) * speed;
+      let vy = Math.sin(launchAngle) * speed;
+
+      let rotation = 0;
+      let hue = 0;
+      let bounceCount = 0;
+      const restitution = 0.92; // energy kept per bounce
+      const friction = 0.998;   // air friction per frame
+      const startTime = performance.now();
+
+      // Trail timer
+      let lastTrailTime = 0;
+
+      function frame(now) {
+        const elapsed = (now - startTime) / 1000;
+
+        // Apply air friction
+        vx *= friction;
+        vy *= friction;
+
+        // Move
+        x += vx;
+        y += vy;
+
+        // Rotation proportional to horizontal speed
+        rotation += vx * 2;
+
+        // Color cycling via hue
+        hue = (hue + 3) % 360;
+        const color = `hsl(${hue}, 85%, 70%)`;
+
+        // Bounce off edges
+        let bounced = false;
+        if (x - halfW < 0) {
+          x = halfW;
+          vx = Math.abs(vx) * restitution;
+          bounced = true;
+        } else if (x + halfW > W) {
+          x = W - halfW;
+          vx = -Math.abs(vx) * restitution;
+          bounced = true;
+        }
+        if (y - halfH < 0) {
+          y = halfH;
+          vy = Math.abs(vy) * restitution;
+          bounced = true;
+        } else if (y + halfH > H) {
+          y = H - halfH;
+          vy = -Math.abs(vy) * restitution;
+          bounced = true;
+        }
+
+        if (bounced) {
+          bounceCount++;
+          spawnBounceSparks(x, y, color);
+        }
+
+        // Trail ghost every 80ms
+        if (now - lastTrailTime > 80 && Math.abs(vx) + Math.abs(vy) > 3) {
+          lastTrailTime = now;
+          spawnTrail(x, y, rotation, color);
+        }
+
+        // Apply transform
+        ball.style.left = x + 'px';
+        ball.style.top = y + 'px';
+        ball.style.transform = `translate(-50%, -50%) rotate(${rotation}deg)`;
+        ball.style.color = color;
+        ball.style.textShadow = `0 0 50px ${color}, 0 0 100px ${color}`;
+
+        // Check if stopped or time exceeded
+        const speed2 = Math.sqrt(vx * vx + vy * vy);
+        if (speed2 < 0.3 || elapsed > duration / 1000) {
+          // Fade out
+          ball.style.transition = 'opacity 0.5s ease';
+          ball.style.opacity = '0';
+          setTimeout(() => ball.remove(), 500);
+          return;
+        }
+
+        billiardRaf = requestAnimationFrame(frame);
+      }
+
+      billiardRaf = requestAnimationFrame(frame);
+    }
+
+    function spawnTrail(x, y, rot, color) {
+      const trail = document.createElement('div');
+      trail.className = 'billiard-trail';
+      trail.innerHTML = '(<span style="display:inline-block;transform:rotate(0deg)">@</span>ω<span style="display:inline-block;transform:rotate(0deg)">@</span>)';
+      trail.style.left = x + 'px';
+      trail.style.top = y + 'px';
+      trail.style.transform = `translate(-50%, -50%) rotate(${rot}deg)`;
+      trail.style.color = color;
+      trail.style.fontSize = '150px';
+      trail.style.fontFamily = '"Segoe UI Emoji", "Apple Color Emoji", sans-serif';
+      document.body.appendChild(trail);
+      setTimeout(() => trail.remove(), 600);
+    }
+
+    function spawnBounceSparks(x, y, color) {
+      for (let i = 0; i < 8; i++) {
+        const spark = document.createElement('div');
+        spark.className = 'billiard-spark';
+        const angle = Math.random() * Math.PI * 2;
+        const dist = 30 + Math.random() * 60;
+        spark.style.left = (x + Math.cos(angle) * dist) + 'px';
+        spark.style.top = (y + Math.sin(angle) * dist) + 'px';
+        spark.style.background = color;
+        spark.style.boxShadow = `0 0 6px ${color}`;
+        document.body.appendChild(spark);
+        setTimeout(() => spark.remove(), 500);
+      }
+    }
+
+    // === Main show handler ===
+    ipcRenderer.on('show-giant', (event, { kaomoji, color, mode }) => {
+      // Cancel any running billiard animation
+      if (billiardRaf) { cancelAnimationFrame(billiardRaf); billiardRaf = null; }
+
+      const el = document.getElementById('giant');
+      el.style.display = '';
+
+      // Remove leftover billiard elements
+      document.querySelectorAll('#billiard, .billiard-trail, .billiard-spark').forEach(e => e.remove());
+
+      const km = kaomoji || pick(KAOMOJI_POOL);
+
+      // Only use billiard when explicitly requested
+      const useBilliard = mode === 'billiard';
+
+      if (useBilliard) {
+        startBilliard(km, 8000);
+        return;
+      }
+
+      // === Normal mode ===
+      const useRainbow = !color && Math.random() < 0.4;
+      const c = color || pick(COLORS);
+
+      el.textContent = km;
+      const minSize = Math.min(window.innerWidth, window.innerHeight) * 0.5;
+      const maxSize = Math.min(window.innerWidth * 0.95, window.innerHeight * 0.9);
+      const fontSize = minSize + Math.random() * Math.max(1, maxSize - minSize);
+      el.style.fontSize = fontSize + 'px';
+
+      if (useRainbow) {
+        el.classList.add('rainbow');
+        el.style.textShadow = '0 0 80px rgba(255,150,200,0.6), 0 0 160px rgba(129,140,248,0.4)';
+      } else {
+        el.style.color = c;
+        el.style.textShadow = `0 0 80px ${c}, 0 0 160px ${c}`;
+      }
+
+      const appearClass = pick(APPEARS);
+      el.className = appearClass + (useRainbow ? ' rainbow' : '');
+
+      const idleClass = pick(IDLES);
+      setTimeout(() => {
+        el.className = idleClass + (useRainbow ? ' rainbow' : '');
+      }, 600);
+
+      const exitClass = pick(EXITS);
+      setTimeout(() => {
+        el.className = exitClass + (useRainbow ? ' rainbow' : '');
+      }, 2400);
+
+      for (let i = 0; i < 30; i++) {
+        setTimeout(() => {
+          const p = document.createElement('span');
+          p.className = 'egg-particle';
+          p.textContent = pick(SYMBOLS);
+          const angle = Math.random() * Math.PI * 2;
+          const dist = 200 + Math.random() * 400;
+          p.style.setProperty('--tx', Math.cos(angle) * dist + 'px');
+          p.style.setProperty('--ty', Math.sin(angle) * dist + 'px');
+          p.style.left = '50%';
+          p.style.top = '50%';
+          p.style.color = useRainbow ? pick(COLORS) : c;
+          p.style.animationDelay = (Math.random() * 0.3) + 's';
+          p.style.fontSize = (20 + Math.random() * 30) + 'px';
+          document.body.appendChild(p);
+        }, i * 30);
+      }
+    });
+  </script>
+</body>
+</html>

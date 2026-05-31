@@ -1,0 +1,26 @@
+{
+  "id": "invaders",
+  "name": "太空侵略者",
+  "emoji": "👾",
+  "order": 50,
+  "version": "1.0.0",
+  "description": "全屏太空侵略者风格颜文字阵列。",
+  "entry": "index.html",
+  "startChannel": "show-invaders",
+  "duration": 22000,
+  "window": {
+    "type": "fullscreen-transparent",
+    "clickThrough": true,
+    "focusable": false,
+    "alwaysOnTop": true
+  },
+  "pet": {
+    "animation": "surprised",
+    "animationDuration": 3000,
+    "particles": null
+  },
+  "params": {
+    "duration": { "type": "number", "default": 22000 }
+  },
+  "enabled": true
+}

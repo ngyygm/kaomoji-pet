@@ -1,0 +1,39 @@
+{
+  "id": "care-rain",
+  "name": "关怀雨",
+  "emoji": "🌧",
+  "order": 20,
+  "version": "1.0.0",
+  "description": "全屏飘落鼓励文字。",
+  "entry": "index.html",
+  "duration": 10000,
+  "closeAfterMs": 25000,
+  "window": {
+    "type": "fullscreen-transparent",
+    "clickThrough": true,
+    "focusable": false,
+    "alwaysOnTop": true
+  },
+  "pet": {
+    "animation": "love",
+    "animationDuration": 3000,
+    "particles": ["heart", 5]
+  },
+  "params": {
+    "duration": { "type": "number", "default": 10000 },
+    "opacity": { "type": "number", "default": 0.75 },
+    "messages": {
+      "type": "array",
+      "default": [
+        "记得休息一下。", "喝口水。", "肩膀放松。", "眼睛眨一眨。", "慢慢来。",
+        "你已经做了很多。", "今天也辛苦啦。", "先深呼吸。", "不用一下子完成。", "我在陪着你。",
+        "保存一下进度吧。", "伸个懒腰。", "换个姿势。", "别忘了吃饭。", "屏幕可以离远一点。",
+        "做得很好。", "一步一步来。", "先照顾好自己。", "给自己一点耐心。", "很稳，继续。",
+        "可以停一分钟。", "任务会被慢慢解决。", "你不是一个人在扛。", "把手腕放松。", "晚点也来得及。",
+        "You are doing great.", "One step at a time.", "Take a tiny break.", "Breathe in, breathe out.",
+        "おつかれさま。", "少し休もう。", "だいじょうぶ。", "ゆっくりでいいよ。"
+      ]
+    }
+  },
+  "enabled": true
+}

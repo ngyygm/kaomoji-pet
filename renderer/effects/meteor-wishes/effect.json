@@ -1,0 +1,25 @@
+{
+  "id": "meteor-wishes",
+  "name": "流星许愿夜",
+  "emoji": "🌠",
+  "order": 90,
+  "version": "1.0.0",
+  "description": "颜文字坐在夜空下，看流星和愿望短句划过。",
+  "entry": "index.html",
+  "duration": 13000,
+  "window": {
+    "type": "fullscreen-transparent",
+    "clickThrough": true,
+    "focusable": false,
+    "alwaysOnTop": true
+  },
+  "pet": {
+    "animation": "happy",
+    "animationDuration": 2600,
+    "particles": ["sparkle", 5]
+  },
+  "params": {
+    "duration": { "type": "number", "default": 13000 }
+  },
+  "enabled": true
+}

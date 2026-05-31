@@ -36,6 +36,13 @@ const EFFECTS = {
   wavy_mouth:     { description: '波浪嘴：≈',        replace: { 'seg-mouth': '≈' }, targetParts: ['mouth'] },
   pout_mouth:     { description: '嘟嘴：∪',         replace: { 'seg-mouth': '∪' }, targetParts: ['mouth'] },
 
+  // === Arm action effects ===
+  arm_wave:        { description: '挥手',             css: { 'seg-arm-l': 'wave', 'seg-arm-r': 'wave' }, particles: 'sparkle', targetParts: ['arm'] },
+  arm_throw:       { description: '丢东西',           css: { 'seg-arm-l': 'throw', 'seg-arm-r': 'throw' }, particles: 'star', targetParts: ['arm'] },
+  arm_shoot:       { description: '发射',             css: { 'seg-arm-l': 'shoot', 'seg-arm-r': 'shoot' }, particles: 'exclaim', targetParts: ['arm'] },
+  arm_shiver:      { description: '手臂抖动',         css: { 'seg-arm-l': 'shake', 'seg-arm-r': 'shake' }, targetParts: ['arm'] },
+  arm_clap:        { description: '拍手',             css: { 'seg-arm-l': 'clap', 'seg-arm-r': 'clap' }, particles: 'note', targetParts: ['arm'] },
+
   // === New Eye effects ===
   wink_eye:       { description: '眨单眼：左开右闭', replace: { 'seg-eye-l': '·', 'seg-eye-r': '-' }, targetParts: ['eye'] },
   wide_eyes:      { description: '大眼：⊙',         replace: { 'seg-eye-l': '⊙', 'seg-eye-r': '⊙' }, css: { 'seg-eye-l': 'pulse', 'seg-eye-r': 'pulse' }, targetParts: ['eye'] },
@@ -68,7 +75,12 @@ const EXPRESSION_COMBOS = {
   wholesome:  { description: '温暖猫',                   effects: ['love_eyes', 'cat_mouth'] },
   pouty:      { description: '嘟嘴不开心',               effects: ['sad_eyes', 'pout_mouth'] },
   shocked:    { description: '震惊',                     effects: ['wide_eyes', 'open_mouth'] },
-  squinting:  { description: '眯眼怀疑',                 effects: ['squint_eyes', 'flat_mouth'] }
+  squinting:  { description: '眯眼怀疑',                 effects: ['squint_eyes', 'flat_mouth'] },
+  arm_wave:   { description: '手臂挥动',                 effects: ['arm_wave'] },
+  arm_throw:  { description: '手臂投掷',                 effects: ['arm_throw'] },
+  arm_shoot:  { description: '手臂发射',                 effects: ['arm_shoot'] },
+  arm_shiver: { description: '手臂抖动',                 effects: ['arm_shiver'] },
+  arm_clap:   { description: '手臂拍手',                 effects: ['arm_clap'] }
 };
 
 /**
@@ -85,10 +97,10 @@ const MOOD_EXPRESSIONS = {
   sad:        ['sad_eyes'],
   love:       ['love_eyes'],
   eating:     ['happy_eyes', 'open_mouth'],
-  playing:    ['star_eyes'],
+  playing:    ['star_eyes', 'arm_wave'],
   surprised:  ['surprised_eyes', 'open_mouth'],
-  greeting:   ['happy_eyes'],
-  walking:    [],
+  greeting:   ['happy_eyes', 'arm_wave'],
+  walking:    ['arm_shiver'],
   satisfied:  ['content_eyes'],
   curious:    ['curious_eyes'],
   alert:      ['surprised_eyes'],
