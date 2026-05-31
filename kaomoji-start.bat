@@ -1,7 +1,7 @@
 @echo off
 cd /d "%~dp0"
 
-if exist "node_modules" goto :launch
+if exist "node_modules\electron\dist\electron.exe" goto :launch
 
 echo ============================================
 echo   kaomoji-pet - First run, installing...
