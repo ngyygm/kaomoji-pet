@@ -50,8 +50,15 @@ function setWindowSizeSafe(win, width, height) {
   const safeWidth = toWindowCoord(width);
   const safeHeight = toWindowCoord(height);
   if (safeWidth === null || safeHeight === null) return false;
-  win.setSize(Math.max(1, safeWidth), Math.max(1, safeHeight));
-  return true;
+  const nextWidth = Math.max(1, safeWidth);
+  const nextHeight = Math.max(1, safeHeight);
+  try {
+    win.setSize(nextWidth, nextHeight);
+    return true;
+  } catch (err) {
+    console.warn('[window] failed to set size', { width: nextWidth, height: nextHeight, error: err.message });
+    return false;
+  }
 }
 
 const effectsDir = path.join(__dirname, 'renderer', 'effects');
