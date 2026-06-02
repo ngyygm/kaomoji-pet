@@ -21,5 +21,7 @@ contextBridge.exposeInMainWorld('petAPI', {
   getGpuStatus: () => ipcRenderer.invoke('gpu:status'),
   listBigEffects: () => ipcRenderer.invoke('big-effects:list'),
   runBigEffect: (id, params) => ipcRenderer.invoke('big-effects:run', { id, params }),
-  showRenameDialog: (currentName) => ipcRenderer.invoke('show-rename-dialog', currentName)
+  showRenameDialog: (currentName) => ipcRenderer.invoke('show-rename-dialog', currentName),
+  onMouseStateReset: (callback) => ipcRenderer.on('mouse-state-reset', (event, data) => callback(data)),
+  onEffectHitTest: (callback) => ipcRenderer.on('effect-hit-test', (event, data) => callback(data))
 });

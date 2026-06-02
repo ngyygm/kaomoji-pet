@@ -7,8 +7,7 @@ class App {
     this.behaviorEngine = null;
     this.gameLoop = null;
     this.saveManager = new SaveManager();
-    this.clickCounter = 0;
-    this.clickTimer = null;
+    this.mouseManager = null;
     this.bigEffects = [];
   }
 
@@ -53,66 +52,9 @@ class App {
     // Double click = pet (slow click)
     petDisplay.addEventListener('dblclick', () => this.doPet());
 
-    // Rapid click combo on kaomoji + manual drag
-    const comboEl = document.createElement('span');
-    comboEl.id = 'combo-count';
-    kaomoji.style.position = 'relative';
-    kaomoji.appendChild(comboEl);
-
-    let dragStartPos = null;
-    let dragWindowPos = null;
-    let isDragging = false;
-
-    kaomoji.addEventListener('mousedown', (e) => {
-      dragStartPos = { x: e.screenX, y: e.screenY };
-      isDragging = false;
-
-      window.petAPI.getWindowPosition().then(pos => {
-        dragWindowPos = pos;
-      });
-
-      const onMouseMove = (me) => {
-        if (!dragStartPos || !dragWindowPos) return;
-        const dx = me.screenX - dragStartPos.x;
-        const dy = me.screenY - dragStartPos.y;
-        if (!isDragging && (Math.abs(dx) > 4 || Math.abs(dy) > 4)) {
-          isDragging = true;
-        }
-        if (isDragging) {
-          window.petAPI.setWindowPosition(dragWindowPos.x + dx, dragWindowPos.y + dy);
-        }
-      };
-
-      const onMouseUp = () => {
-        document.removeEventListener('mousemove', onMouseMove);
-        document.removeEventListener('mouseup', onMouseUp);
-
-        if (!isDragging) {
-          this.clickCounter++;
-          if (this.clickTimer) clearTimeout(this.clickTimer);
-          this.clickTimer = setTimeout(() => {
-            this.clickCounter = 0;
-            comboEl.classList.remove('visible');
-          }, 3000);
-
-          comboEl.textContent = this.clickCounter;
-          comboEl.classList.remove('visible');
-          void comboEl.offsetWidth;
-          comboEl.classList.add('visible');
-
-          if (this.clickCounter >= 10) {
-            this.behaviorEngine.triggerBigEffect();
-          }
-        }
-
-        dragStartPos = null;
-        dragWindowPos = null;
-        isDragging = false;
-      };
-
-      document.addEventListener('mousemove', onMouseMove);
-      document.addEventListener('mouseup', onMouseUp);
-    });
+    // Unified mouse manager: hit-test, drag, click combo, watchdog
+    this.mouseManager = new MouseManager();
+    this.mouseManager.init();
   }
 
   setupContextMenu() {
@@ -234,6 +176,8 @@ class App {
       if (this.renderer._isSleeping) return;
       this.renderer.handleGlobalMouse(data);
     });
+    // Note: onMouseStateReset and onEffectHitTest are now registered
+    // directly by MouseManager.init() — no forwarding needed here.
   }
 
   doPet() {
@@ -259,19 +203,6 @@ class App {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-  const app = new App();
-  app.init();
-
-  // Hit-test: only capture mouse on non-transparent pixels
-  document.body.addEventListener('mousemove', (e) => {
-    const el = document.elementFromPoint(e.clientX, e.clientY);
-    const interactive = el && (
-      el.closest('#kaomoji') ||
-      el.closest('#context-menu') ||
-      el.closest('#speech-bubble') ||
-      el.closest('#bottom-section') ||
-      el.closest('#combo-count')
-    );
-    window.petAPI.setIgnoreMouseEvents(!interactive, { forward: true });
-  });
+  window.app = new App();
+  window.app.init();
 });

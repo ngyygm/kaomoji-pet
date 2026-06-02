@@ -76,6 +76,17 @@
       30% { opacity: 1; transform: scale(1.3); }
       100% { opacity: 0; transform: scale(0.8) translateY(-20px); }
     }
+    .honor-sparkle {
+      position: absolute;
+      pointer-events: none;
+      border-radius: 50%;
+      animation: sparkleFloat 0.8s ease-out forwards;
+    }
+    @keyframes sparkleFloat {
+      0% { opacity: 0.9; transform: scale(1) translateY(0); }
+      50% { opacity: 0.6; }
+      100% { opacity: 0; transform: scale(0.3) translate(var(--sp-tx), var(--sp-ty)); }
+    }
     .bump-shake {
       animation: bumpShake 300ms ease-out !important;
     }
@@ -170,12 +181,44 @@
       const screenWidth = window.innerWidth;
       const screenHeight = window.innerHeight;
 
-      // === Randomization ===
-      // Direction: left-to-right or right-to-left
-      const goRight = Math.random() > 0.5;
-      const formationWidth = screenWidth * rand(0.78, 0.92);
-      const formationHeight = screenHeight * rand(0.62, 0.82);
-      const baseY = screenHeight * rand(0.06, 0.12);
+      // === Direction system: 8 directions ===
+      const DIRECTIONS = [
+        { dx:  1, dy:  0 },  // → right
+        { dx: -1, dy:  0 },  // ← left
+        { dx:  0, dy:  1 },  // ↓ down
+        { dx:  0, dy: -1 },  // ↑ up
+        { dx:  1, dy:  1 },  // ↘ down-right
+        { dx: -1, dy:  1 },  // ↙ down-left
+        { dx:  1, dy: -1 },  // ↗ up-right
+        { dx: -1, dy: -1 },  // ↖ up-left
+      ];
+      const { dx, dy } = pick(DIRECTIONS);
+      const isHoriz = dy === 0;
+      const isVert  = dx === 0;
+
+      // Perpendicular direction (for spreading followers, confused drift, etc.)
+      const perpX = -dy;
+      const perpY =  dx;
+
+      // === Formation dimensions (adapt to direction) ===
+      let formationWidth, formationHeight;
+      if (isVert) {
+        formationWidth  = screenWidth  * rand(0.65, 0.8);
+        formationHeight = screenHeight * rand(0.35, 0.5);
+      } else if (isHoriz) {
+        formationWidth  = screenWidth  * rand(0.78, 0.92);
+        formationHeight = screenHeight * rand(0.62, 0.82);
+      } else {
+        formationWidth  = screenWidth  * rand(0.5, 0.65);
+        formationHeight = screenHeight * rand(0.35, 0.5);
+      }
+
+      // Grid base offset: positions the formation in the perpendicular direction
+      // Horizontal travel → offset Y ; Vertical travel → offset X ; Diagonal → no offset
+      let gridBaseX = 0, gridBaseY = 0;
+      if (isHoriz)      gridBaseY = screenHeight * rand(0.06, 0.12);
+      else if (isVert)  gridBaseX = screenWidth  * rand(0.1, 0.25);
+
       // Formation shape
       const formation = pick(FORMATIONS);
       // Color palette
@@ -235,27 +278,24 @@
 
       // Compute grid positions based on formation
       function getGridPos(r, c) {
-        let gx = c * COL_SPACING;
-        let gy = baseY + r * ROW_SPACING;
+        let gx = gridBaseX + c * COL_SPACING;
+        let gy = gridBaseY + r * ROW_SPACING;
         if (formation === 'wedge') {
-          // V-formation: rows fan out from center
           const halfCols = (COLS - 1) / 2;
-          gx = (c - halfCols) * COL_SPACING * 1.1;
-          gy = baseY + (Math.abs(c - halfCols) + r) * ROW_SPACING * 0.7;
+          gx = gridBaseX + (c - halfCols) * COL_SPACING * 1.1;
+          gy = gridBaseY + (Math.abs(c - halfCols) + r) * ROW_SPACING * 0.7;
         } else if (formation === 'diagonal') {
-          // Diagonal lines going down-right
-          gx = c * COL_SPACING + r * 35;
-          gy = baseY + r * ROW_SPACING;
+          gx = gridBaseX + c * COL_SPACING + r * 35;
+          gy = gridBaseY + r * ROW_SPACING;
         } else if (formation === 'scattered') {
-          // Slightly randomized positions around grid
-          gx = c * COL_SPACING + rand(-15, 15);
-          gy = baseY + r * ROW_SPACING + rand(-8, 8);
+          gx = gridBaseX + c * COL_SPACING + rand(-15, 15);
+          gy = gridBaseY + r * ROW_SPACING + rand(-8, 8);
         } else if (formation === 'block') {
-          gx = c * COL_SPACING + (r % 2) * COL_SPACING * 0.18;
-          gy = baseY + r * ROW_SPACING;
+          gx = gridBaseX + c * COL_SPACING + (r % 2) * COL_SPACING * 0.18;
+          gy = gridBaseY + r * ROW_SPACING;
         } else if (formation === 'wide') {
-          gx = c * COL_SPACING * 0.9;
-          gy = baseY + r * ROW_SPACING * 1.25 + Math.sin(c * 0.7) * 8;
+          gx = gridBaseX + c * COL_SPACING * 0.9;
+          gy = gridBaseY + r * ROW_SPACING * 1.25 + Math.sin(c * 0.7) * 8;
         }
         return { gx, gy };
       }
@@ -325,18 +365,36 @@
       }
 
       // === Honor Guard (仪仗队): 4 soldiers in 1+3 pattern, leading the parade ===
-      const honorGuardGap = 90 + rand(20, 60);
-      const hgSpread = COL_SPACING * 1.5;
-      const hgCenterX = goRight ? (formationWidth + honorGuardGap) : -honorGuardGap;
-      const hgCenterY = baseY + (ROWS - 1) * ROW_SPACING / 2;
+      const halfFormW = (COLS - 1) * COL_SPACING / 2;
+      const halfFormH = (ROWS - 1) * ROW_SPACING / 2;
+      // Formation center in grid coordinates
+      const fcGx = gridBaseX + halfFormW;
+      const fcGy = gridBaseY + halfFormH;
+
+      // Gap between formation edge and honor guard
+      const honorGuardGap = Math.max(formationWidth, formationHeight) * 0.25 + rand(40, 80);
+      const hgGap = Math.max(COL_SPACING, ROW_SPACING) * 1.2;
+
+      // Distance from formation center to its edge in the travel direction
+      const edgeDist = (dx !== 0 ? halfFormW : 0) + (dy !== 0 ? halfFormH : 0);
+
+      // Honor guard center: beyond the formation edge
+      const hgCenterGx = fcGx + dx * (edgeDist + honorGuardGap);
+      const hgCenterGy = fcGy + dy * (edgeDist + honorGuardGap);
+
+      // Leader: even further in the direction of travel
+      const leaderGx = hgCenterGx + dx * hgGap;
+      const leaderGy = hgCenterGy + dy * hgGap;
+
+      // 3 followers: behind the leader, spread perpendicular to travel direction
+      const perpSpread = Math.max(halfFormW, halfFormH) * 0.35;
       const hgPositions = [
-        // Row 0: 1 soldier centered
-        { gx: hgCenterX, gy: hgCenterY - ROW_SPACING * 0.6 },
-        // Row 1: 3 soldiers spread
-        { gx: hgCenterX - hgSpread, gy: hgCenterY + ROW_SPACING * 0.4 },
-        { gx: hgCenterX, gy: hgCenterY + ROW_SPACING * 0.4 },
-        { gx: hgCenterX + hgSpread, gy: hgCenterY + ROW_SPACING * 0.4 },
+        { gx: leaderGx, gy: leaderGy },  // Leader at front
+        { gx: hgCenterGx + perpX * perpSpread, gy: hgCenterGy + perpY * perpSpread },
+        { gx: hgCenterGx, gy: hgCenterGy },
+        { gx: hgCenterGx - perpX * perpSpread, gy: hgCenterGy - perpY * perpSpread },
       ];
+
       const hgColors = ['#fde68a', '#fbbf24', '#f59e0b', '#fcd34d'];
       const hgTexts = ['ฅ•̀∀•́ฅ', '(ง •_•)ง', 'ψ(｀∇´)ψ', '(=^・ω・^=)'];
       for (let i = 0; i < 4; i++) {
@@ -359,7 +417,7 @@
           fontSize: leaderFontSize + 4,
           gridX: hgPositions[i].gx,
           gridY: hgPositions[i].gy,
-          enterDelay: i * rand(5, 15),
+          enterDelay: 0, // Appear immediately
           marchPhase: rand(0, Math.PI * 2),
           amplitude: baseAmplitude + 4,
           stragglerPanicked: false,
@@ -369,11 +427,26 @@
         });
       }
 
-      // Direction-dependent start/end (account for honor guard width)
-      const totalFormationWidth = formationWidth + honorGuardGap + hgSpread * 2;
-      const travelPad = totalFormationWidth + 220;
-      const startX = goRight ? -travelPad : (screenWidth + travelPad);
-      const endX = goRight ? (screenWidth + 160) : -(totalFormationWidth + 160);
+      // Main formation appears after honor guard has been visible for a moment
+      const mainFormationDelay = 400;
+      marchers.forEach(m => {
+        if (m.role !== 'honor_guard') {
+          m.enterDelay += mainFormationDelay;
+        }
+      });
+
+      // === Start / End positions for the travel path ===
+      // Rearmost grid position (formation tail, opposite corner from travel direction)
+      const rearGx = dx > 0 ? gridBaseX : dx < 0 ? gridBaseX + (COLS - 1) * COL_SPACING : fcGx;
+      const rearGy = dy > 0 ? gridBaseY : dy < 0 ? gridBaseY + (ROWS - 1) * ROW_SPACING : fcGy;
+
+      // Frontmost (leader) enters from the screen edge in the travel direction
+      // Tail exits past the opposite edge
+      // For axes not in the travel direction, base stays at 0 (grid positions handle placement)
+      const startX = dx !== 0 ? ((dx > 0 ? -20 : screenWidth + 20) - leaderGx) : 0;
+      const startY = dy !== 0 ? ((dy > 0 ? -20 : screenHeight + 20) - leaderGy) : 0;
+      const endX   = dx !== 0 ? ((dx > 0 ? screenWidth + 100 : -100) - rearGx) : 0;
+      const endY   = dy !== 0 ? ((dy > 0 ? screenHeight + 100 : -100) - rearGy) : 0;
 
       let startTime = null;
       let animDone = false;
@@ -457,57 +530,75 @@
         setTimeout(() => releaseFxEl('bump-exclaim', ex), 520);
       }
 
-      function getMarcherPosition(marcher, baseX, progress, time) {
+      function spawnHonorSparkle(x, y, color) {
+        const sp = acquireFxEl('honor-sparkle');
+        const size = 3 + Math.random() * 4;
+        sp.style.width = size + 'px';
+        sp.style.height = size + 'px';
+        sp.style.left = (x + (Math.random() - 0.5) * 20) + 'px';
+        sp.style.top = (y + (Math.random() - 0.5) * 10) + 'px';
+        sp.style.background = color;
+        sp.style.boxShadow = `0 0 6px ${color}`;
+        sp.style.setProperty('--sp-tx', (Math.random() * 30 - 15) + 'px');
+        sp.style.setProperty('--sp-ty', (-10 - Math.random() * 20) + 'px');
+        setTimeout(() => releaseFxEl('honor-sparkle', sp), 820);
+      }
+
+      function getMarcherPosition(marcher, baseXVal, baseYVal, progress, time) {
         let offsetX = 0;
         let offsetY = 0;
 
-        // Leader is slightly ahead (in the direction of travel)
+        // Leader is slightly ahead (opposite to travel direction for visual depth)
         if (marcher.role === ROLE_LEADER) {
-          offsetX = goRight ? -30 : 30;
+          offsetX = -dx * 30;
+          offsetY = -dy * 30;
           marcher.amplitude = baseAmplitude + 6;
         }
 
         // Vertical bob with individual phase
         const bob = Math.sin(time * marchFreq + marcher.marchPhase) * marcher.amplitude;
 
-        let finalX = baseX + marcher.gridX + offsetX;
-        let finalY = marcher.gridY + bob + offsetY;
+        let finalX = baseXVal + marcher.gridX + offsetX;
+        let finalY = baseYVal + marcher.gridY + bob + offsetY;
 
-        // Direction-aware offsets for straggler/confused
-        const dirSign = goRight ? -1 : 1; // "behind" direction
-
-        // Straggler behavior
+        // Straggler behavior: falls behind in the travel direction
         if (marcher.role === ROLE_STRAGGLER) {
           const fallDist = rand(100, 170);
           if (progress < 0.3) {
             // Normal march
           } else if (progress < 0.6) {
             const slowPhase = (progress - 0.3) / 0.3;
-            finalX += dirSign * slowPhase * fallDist;
+            finalX += (-dx) * slowPhase * fallDist;
+            finalY += (-dy) * slowPhase * fallDist;
           } else if (progress < 0.65) {
             marcher.stragglerPanicked = true;
             const sprintPhase = (progress - 0.6) / 0.05;
-            finalX += dirSign * (fallDist - sprintPhase * (fallDist + 30));
+            finalX += (-dx) * (fallDist - sprintPhase * (fallDist + 30));
+            finalY += (-dy) * (fallDist - sprintPhase * (fallDist + 30));
           } else if (progress < 0.75) {
             const settlePhase = (progress - 0.65) / 0.1;
-            finalX += -dirSign * (30 - settlePhase * 30);
+            finalX += dx * (30 - settlePhase * 30);
+            finalY += dy * (30 - settlePhase * 30);
           }
         }
 
-        // Confused behavior
+        // Confused behavior: drifts perpendicular to travel direction, bumps into neighbor
         if (marcher.role === ROLE_CONFUSED) {
           if (progress > 0.25 && progress < 0.4) {
             const driftPhase = (progress - 0.25) / 0.15;
-            finalY -= driftPhase * ROW_SPACING;
+            finalX += perpX * driftPhase * ROW_SPACING;
+            finalY += perpY * driftPhase * ROW_SPACING;
           } else if (progress >= 0.4 && progress < 0.42) {
-            finalY -= ROW_SPACING;
+            finalX += perpX * ROW_SPACING;
+            finalY += perpY * ROW_SPACING;
             if (!marcher.confusedBumped) {
               marcher.confusedBumped = true;
             }
           } else if (progress >= 0.42 && progress < 0.5) {
             const wobblePhase = (progress - 0.42) / 0.08;
             const remaining = (1 - wobblePhase) * ROW_SPACING;
-            finalY -= remaining * (1 - wobblePhase);
+            finalX += perpX * remaining * (1 - wobblePhase);
+            finalY += perpY * remaining * (1 - wobblePhase);
             finalX += Math.sin(time * 20) * 5 * (1 - wobblePhase);
           }
         }
@@ -521,7 +612,8 @@
         const progress = Math.min(elapsed / duration, 1);
         const timeSeconds = elapsed / 1000;
 
-        const baseX = startX + progress * (endX - startX);
+        const baseXVal = startX + progress * (endX - startX);
+        const baseYVal = startY + progress * (endY - startY);
 
         dustTimer += 1;
         noteTimer += 1;
@@ -533,7 +625,7 @@
           const localElapsed = elapsed - marcher.enterDelay;
           const fadeIn = Math.min(localElapsed / 300, 1);
 
-          const pos = getMarcherPosition(marcher, baseX, progress, timeSeconds);
+          const pos = getMarcherPosition(marcher, baseXVal, baseYVal, progress, timeSeconds);
 
           marcher.el.style.transform = `translate(${pos.x}px, ${pos.y}px)`;
           marcher.el.style.opacity = fadeIn;
@@ -545,6 +637,11 @@
 
           if (dustTimer % 8 === 0 && progress < 0.95 && (marcher.row + marcher.col) % 3 === dustTimer % 3) {
             spawnDust(pos.x + marcher.fontSize * 0.4, pos.y + marcher.fontSize * 0.8, marcher.color);
+          }
+
+          // Honor guard sparkle particles (occasional, not too many)
+          if (marcher.role === 'honor_guard' && progress > 0.02 && progress < 0.95 && Math.random() < 0.12) {
+            spawnHonorSparkle(pos.x + marcher.fontSize * 0.3, pos.y, marcher.color);
           }
 
           if (noteTimer % 60 === 0 && Math.random() < 0.15 && progress > 0.05 && progress < 0.9 && marcher.row === 0 && marcher.col % 3 === 0) {

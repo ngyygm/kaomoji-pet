@@ -29,12 +29,12 @@ html, body {
   pointer-events: none;
 }
 
-/* Interactive elements: no drag */
+/* Interactive elements: ensure pointer-events enabled */
 .ctx-item,
 #bubble-decode-btn,
 #bottom-section,
 #kaomoji {
-  -webkit-app-region: no-drag;
+  pointer-events: auto;
 }
 
 /* Speech Bubble */
@@ -83,15 +83,18 @@ html, body {
   align-items: center;
   justify-content: center;
   cursor: grab;
-  -webkit-app-region: drag;
+  /* Removed -webkit-app-region: drag — conflicts with JS drag on Windows Electron.
+     The native drag intercepts mousedown before JS, preventing click/drag interactions.
+     JS handles all drag logic via mousedown/mousemove/mouseup on #kaomoji. */
   flex-shrink: 0;
   pointer-events: none;
 }
 
 #combo-count {
   position: absolute;
-  top: -10px;
-  right: -16px;
+  top: 0;
+  left: 50%;
+  transform: translateX(30px) translateY(-10px);
   font-size: 14px;
   font-weight: bold;
   color: #818cf8;
@@ -106,7 +109,7 @@ html, body {
 
 #combo-count.visible {
   opacity: 1;
-  transform: scale(1.2);
+  transform: translateX(30px) translateY(-10px) scale(1.2);
   width: auto;
 }
 

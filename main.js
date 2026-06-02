@@ -12,6 +12,9 @@ let systemMonitorTimer = null;
 let isCharging = true;
 let cpuSamples = [];
 const activeEffectWindows = new Map();
+let mouseResetTimer = null;
+let effectHitTestTimer = null;
+const MAX_CONCURRENT_EFFECTS = 2;
 
 function configureChromelessWindow(win) {
   if (typeof win.setAutoHideMenuBar === 'function') win.setAutoHideMenuBar(true);
@@ -146,7 +149,21 @@ function createEffectWindow(effect, resolvedParams) {
   });
 
   configureChromelessWindow(effectWin);
-  if (winConfig.clickThrough !== false) effectWin.setIgnoreMouseEvents(true);
+  if (winConfig.clickThrough !== false) effectWin.setIgnoreMouseEvents(true, { forward: true });
+  // Cancel any pending mouse reset — a new effect is starting, the
+  // reset will happen when this window eventually closes.
+  if (mouseResetTimer) { clearTimeout(mouseResetTimer); mouseResetTimer = null; }
+
+  // Raise main window above effect windows in z-order so mouse events
+  // reach it first. Effect window is visually fullscreen-transparent so
+  // the animation shows through the main window's transparent areas.
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.setAlwaysOnTop(true, 'floating');
+  }
+
+  // Start polling cursor position for hit-test while effects are active.
+  // This bypasses OS-level mouse routing issues on Windows.
+  startEffectHitTestPolling();
 
   effectWin.loadFile(effect.entryPath);
   effectWin.webContents.on('did-finish-load', () => {
@@ -165,6 +182,38 @@ function createEffectWindow(effect, resolvedParams) {
     if (activeEffectWindows.get(effect.id) === effectWin) {
       activeEffectWindows.delete(effect.id);
     }
+    // Debounced reset: if multiple effects close in quick succession,
+    // only trigger one reset after the last one settles.
+    if (mouseResetTimer) clearTimeout(mouseResetTimer);
+    mouseResetTimer = setTimeout(() => {
+      mouseResetTimer = null;
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.setIgnoreMouseEvents(true, { forward: true });
+
+        // Restore main window z-order to default when no effects active
+        if (activeEffectWindows.size === 0) {
+          mainWindow.setAlwaysOnTop(true);
+          stopEffectHitTestPolling();
+        }
+
+        // Send cursor position to renderer using relX/relY from the
+        // global mouse tracker (DPI-safe, already in CSS coordinates).
+        // We compute it here from screen coordinates, but the renderer
+        // also caches positions from the global-mouse IPC which is more
+        // reliable on high-DPI displays.
+        try {
+          const cursor = screen.getCursorScreenPoint();
+          const bounds = mainWindow.getBounds();
+          mainWindow.webContents.send('mouse-state-reset', {
+            relX: cursor.x - bounds.x,
+            relY: cursor.y - bounds.y
+          });
+        } catch (err) {
+          // Send without coords — renderer will fall back to cached position
+          mainWindow.webContents.send('mouse-state-reset', null);
+        }
+      }
+    }, 100);
   });
 
   return effectWin;
@@ -187,6 +236,12 @@ function runBigEffect(effectId, params = {}) {
   const existing = activeEffectWindows.get(effect.id);
   if (existing && !existing.isDestroyed()) existing.close();
 
+  // Cap concurrent effect windows to prevent OS-level mouse routing confusion
+  if (activeEffectWindows.size >= MAX_CONCURRENT_EFFECTS) {
+    const [oldestId, oldestWin] = activeEffectWindows.entries().next().value;
+    if (oldestWin && !oldestWin.isDestroyed()) oldestWin.close();
+  }
+
   const win = createEffectWindow(effect, resolvedParams);
   activeEffectWindows.set(effect.id, win);
 
@@ -202,6 +257,34 @@ ipcMain.handle('gpu:status', () => ({
   featureStatus: app.getGPUFeatureStatus(),
   appMetrics: app.getAppMetrics()
 }));
+
+// Effect hit-test polling: while effect windows are active, periodically
+// send cursor position to the renderer so it can do hit-testing even when
+// OS-level mouse events don't properly route through effect windows.
+function startEffectHitTestPolling() {
+  if (effectHitTestTimer) return;
+  effectHitTestTimer = setInterval(() => {
+    if (activeEffectWindows.size === 0 || !mainWindow || mainWindow.isDestroyed()) {
+      stopEffectHitTestPolling();
+      return;
+    }
+    try {
+      const cursor = screen.getCursorScreenPoint();
+      const bounds = mainWindow.getBounds();
+      mainWindow.webContents.send('effect-hit-test', {
+        relX: cursor.x - bounds.x,
+        relY: cursor.y - bounds.y
+      });
+    } catch (_) {}
+  }, 150);
+}
+
+function stopEffectHitTestPolling() {
+  if (effectHitTestTimer) {
+    clearInterval(effectHitTestTimer);
+    effectHitTestTimer = null;
+  }
+}
 
 function createMainWindow() {
   const { width: screenWidth, height: screenHeight } = screen.getPrimaryDisplay().workAreaSize;
@@ -625,6 +708,20 @@ ipcMain.handle('show-rename-dialog', (event, currentName) => {
 
     renameWin.on('closed', () => {
       ipcMain.removeAllListeners('rename-result');
+      // Reset mouse state after rename dialog closes (it steals focus)
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.setIgnoreMouseEvents(true, { forward: true });
+        try {
+          const cursor = screen.getCursorScreenPoint();
+          const bounds = mainWindow.getBounds();
+          mainWindow.webContents.send('mouse-state-reset', {
+            relX: cursor.x - bounds.x,
+            relY: cursor.y - bounds.y
+          });
+        } catch (err) {
+          mainWindow.webContents.send('mouse-state-reset', null);
+        }
+      }
       resolve(null);
     });
   });
