@@ -100,6 +100,49 @@
     return img;
   }
 
+  // === Text Sprite Cache ===
+  // Pre-renders each (char, fontSize, color) combo onto an offscreen canvas,
+  // so we use fast drawImage() instead of slow fillText() every frame.
+
+  const textSpriteCache = new Map();
+  const MAX_TEXT_SPRITES = 3000;
+
+  function getTextSprite(char, fontSize, color) {
+    const key = `${char}_${fontSize}_${color}`;
+    let sprite = textSpriteCache.get(key);
+    if (sprite) return sprite;
+
+    if (textSpriteCache.size >= MAX_TEXT_SPRITES) {
+      const oldest = textSpriteCache.keys().next().value;
+      textSpriteCache.delete(oldest);
+    }
+
+    const font = `${fontSize}px "Segoe UI Emoji", "Apple Color Emoji", sans-serif`;
+
+    // Measure text dimensions
+    const tmpC = document.createElement('canvas');
+    tmpC.width = 1; tmpC.height = 1;
+    const tc = tmpC.getContext('2d');
+    tc.font = font;
+    const m = tc.measureText(char);
+    const w = Math.ceil(m.width) + 4;
+    const h = Math.ceil(fontSize * 1.5) + 4;
+
+    // Render character onto offscreen canvas (one-time cost)
+    const c = document.createElement('canvas');
+    c.width = w; c.height = h;
+    const sc = c.getContext('2d');
+    sc.font = font;
+    sc.textAlign = 'center';
+    sc.textBaseline = 'middle';
+    sc.fillStyle = color;
+    sc.fillText(char, w / 2, h / 2);
+
+    sprite = { canvas: c, w, h, hw: w / 2, hh: h / 2 };
+    textSpriteCache.set(key, sprite);
+    return sprite;
+  }
+
   // === DOM Element Pool ===
 
   function createElementPool(tag, maxPool = 80) {
@@ -234,21 +277,15 @@
       ctx.globalAlpha = 1;
     }
 
-    // === drawGlowText: for text-based particles with glow ===
+    // === drawGlowText: sprite-cached text rendering (no separate glow layer) ===
 
     function drawGlowText(ctx, text, x, y, font, color, alpha, blur) {
+      const fontSize = parseInt(font) || 12;
+      const sprite = getTextSprite(text, fontSize, color);
+
+      // Single drawImage — no separate glow bitmap, half the draw calls
       ctx.globalAlpha = alpha;
-      ctx.font = font;
-      if (state.gpuMode === 'gpu') {
-        ctx.shadowBlur = blur * state.quality;
-        ctx.fillStyle = color;
-        ctx.fillText(text, x, y);
-        ctx.shadowBlur = 0;
-      } else {
-        // CPU: skip glow, just draw text
-        ctx.fillStyle = color;
-        ctx.fillText(text, x, y);
-      }
+      ctx.drawImage(sprite.canvas, x - sprite.hw, y - sprite.hh);
       ctx.globalAlpha = 1;
     }
 
