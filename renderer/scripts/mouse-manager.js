@@ -26,6 +26,7 @@ class MouseManager {
 
     // Hit-test state tracking
     this._lastHitTestIgnore = true; // sync with mainWindow's initial state
+    this._effectActive = false; // true while effect windows are open
 
     // Watchdog
     this._watchdogTimer = null;
@@ -85,6 +86,23 @@ class MouseManager {
       });
     }
 
+    // Receive effect-active state changes from main process
+    if (window.petAPI && window.petAPI.onEffectActive) {
+      window.petAPI.onEffectActive((active) => {
+        this._effectActive = active;
+        console.log(`[MouseManager] effectActive=${active}`);
+        if (active) {
+          // Force main window to capture ALL events during effects
+          // This ensures clicks work regardless of effect window z-order
+          if (this._lastHitTestIgnore !== false) {
+            this._lastHitTestIgnore = false;
+            window.petAPI.setIgnoreMouseEvents(false, { forward: true });
+            console.log(`[MouseManager] >>> FORCED ignoreMouseEvents(false) for effect`);
+          }
+        }
+      });
+    }
+
     console.log('[MouseManager] initialized');
   }
 
@@ -99,14 +117,14 @@ class MouseManager {
     // ignoreMouseEvents while the user is interacting with the pet
     if (this._dragStartPos) return;
 
-    this._doHitTest(e.clientX, e.clientY);
+    this._doHitTest(e.clientX, e.clientY, 'mousemove');
   }
 
   /**
    * Core hit-test logic. Checks if (x,y) is over an interactive element
    * and toggles ignoreMouseEvents accordingly.
    */
-  _doHitTest(x, y) {
+  _doHitTest(x, y, source) {
     const el = document.elementFromPoint(x, y);
     const interactive = el && (
       el.closest('#kaomoji') ||
@@ -116,18 +134,30 @@ class MouseManager {
       el.closest('#combo-count')
     );
 
-    const shouldIgnore = !interactive;
+    let shouldIgnore = !interactive;
+
+    // During effects: ALWAYS keep the window in capture mode (ignore=false).
+    // This ensures the main window can receive clicks even when the effect
+    // window is on top. The main window is small (350x260) so capturing
+    // all events in its area during a short effect is acceptable.
+    if (this._effectActive) {
+      shouldIgnore = false;
+    }
+
+    console.log(`[MouseManager] hitTest(${source}) x=${Math.round(x)} y=${Math.round(y)} el=${el?.tagName||'null'} interactive=${!!interactive} shouldIgnore=${shouldIgnore} effect=${this._effectActive}`);
 
     // Only send IPC when state actually changes (reduces noise)
     if (this._lastHitTestIgnore !== shouldIgnore) {
       this._lastHitTestIgnore = shouldIgnore;
       window.petAPI.setIgnoreMouseEvents(shouldIgnore, { forward: true });
+      console.log(`[MouseManager] >>> setIgnoreMouseEvents(${shouldIgnore}) from ${source}`);
     }
   }
 
   // ==================== Drag & Click ====================
 
   _onMouseDown(e) {
+    console.log(`[MouseManager] mousedown on kaomoji! dragStartPos was=${this._dragStartPos}`);
     this._dragStartPos = { x: e.screenX, y: e.screenY };
     this._isDragging = false;
 
@@ -213,7 +243,7 @@ class MouseManager {
     // - DPI coordinate mismatch
     // - state desync after rapid effects
     if (this._lastCursorRelX >= 0 && !this._dragStartPos) {
-      this._doHitTest(this._lastCursorRelX, this._lastCursorRelY);
+      this._doHitTest(this._lastCursorRelX, this._lastCursorRelY, 'watchdog');
     }
   }
 
@@ -223,6 +253,7 @@ class MouseManager {
    * (which is already in CSS/DIP coordinates — no DPI conversion needed).
    */
   onEffectWindowClosed(data) {
+    console.log(`[MouseManager] onEffectWindowClosed data=${JSON.stringify(data)} cached=(${this._lastCursorRelX},${this._lastCursorRelY})`);
     // Reset to safe pass-through state first
     if (this._lastHitTestIgnore !== true) {
       this._lastHitTestIgnore = true;
@@ -240,7 +271,7 @@ class MouseManager {
     }
 
     if (typeof x === 'number') {
-      this._doHitTest(x, y);
+      this._doHitTest(x, y, 'effect-closed');
     }
   }
 
@@ -250,7 +281,7 @@ class MouseManager {
    */
   _runSyntheticHitTest(x, y) {
     if (this._dragStartPos) return;
-    this._doHitTest(x, y);
+    this._doHitTest(x, y, 'effect-poll');
   }
 
   // ==================== Cleanup ====================

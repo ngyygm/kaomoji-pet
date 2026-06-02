@@ -125,6 +125,14 @@ function getBigEffectSummaries() {
 function createEffectWindow(effect, resolvedParams) {
   const { width, height } = screen.getPrimaryDisplay().workAreaSize;
   const winConfig = effect.window || {};
+
+  // CRITICAL: Effect window must NOT be alwaysOnTop on Windows.
+  // On Windows, setIgnoreMouseEvents(true) + alwaysOnTop does NOT reliably
+  // pass mouse events to windows below. The only reliable solution is to
+  // make the main pet window (alwaysOnTop) sit ABOVE the effect window,
+  // so the OS routes mouse events to the main window FIRST.
+  // The effect is fullscreen-transparent, so its animation shows through
+  // the main window's transparent areas.
   const effectWin = new BrowserWindow({
     title: ' ',
     width,
@@ -134,13 +142,14 @@ function createEffectWindow(effect, resolvedParams) {
     transparent: true,
     frame: false,
     titleBarStyle: 'hidden',
-    alwaysOnTop: winConfig.alwaysOnTop !== false,
+    alwaysOnTop: false,
     resizable: false,
-    focusable: winConfig.focusable === true,
+    focusable: false,
     skipTaskbar: true,
     autoHideMenuBar: true,
     hasShadow: false,
     backgroundColor: '#00000000',
+    show: false,
     webPreferences: {
       nodeIntegration: true,
       contextIsolation: false,
@@ -149,24 +158,34 @@ function createEffectWindow(effect, resolvedParams) {
   });
 
   configureChromelessWindow(effectWin);
-  if (winConfig.clickThrough !== false) effectWin.setIgnoreMouseEvents(true, { forward: true });
-  // Cancel any pending mouse reset — a new effect is starting, the
-  // reset will happen when this window eventually closes.
+  // setIgnoreMouseEvents(true) without {forward: true} — avoid low-level
+  // hook conflicts with the main window.
+  if (winConfig.clickThrough !== false) effectWin.setIgnoreMouseEvents(true);
+
+  // Cancel any pending mouse reset — a new effect is starting
   if (mouseResetTimer) { clearTimeout(mouseResetTimer); mouseResetTimer = null; }
 
-  // Raise main window above effect windows in z-order so mouse events
-  // reach it first. Effect window is visually fullscreen-transparent so
-  // the animation shows through the main window's transparent areas.
+  // Force main window to capture ALL events during the effect.
+  // Main window is alwaysOnTop, so it's above the effect window.
+  // Mouse events reach main window first → kaomoji stays clickable.
   if (mainWindow && !mainWindow.isDestroyed()) {
-    mainWindow.setAlwaysOnTop(true, 'floating');
+    mainWindow.setIgnoreMouseEvents(false);
+    mainWindow.moveTop();
+    console.log('[EffectWindow] mainWindow forced to capture mode (ignoreMouseEvents=false)');
   }
 
-  // Start polling cursor position for hit-test while effects are active.
-  // This bypasses OS-level mouse routing issues on Windows.
+  // Start polling cursor position for hit-test while effects are active
   startEffectHitTestPolling();
 
+  // Notify renderer that effect is active — force capture mode
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send('effect-active', true);
+  }
+
+  // Show effect window AFTER main window is raised, so z-order is correct
   effectWin.loadFile(effect.entryPath);
   effectWin.webContents.on('did-finish-load', () => {
+    effectWin.showInactive(); // show without stealing focus
     const payload = {
       id: effect.id,
       duration: resolvedParams.duration,
@@ -175,6 +194,10 @@ function createEffectWindow(effect, resolvedParams) {
     effectWin.webContents.send('effect:start', payload);
     if (effect.startChannel) {
       effectWin.webContents.send(effect.startChannel, resolvedParams);
+    }
+    // Re-raise main window after effect window shows
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.moveTop();
     }
   });
 
@@ -188,19 +211,16 @@ function createEffectWindow(effect, resolvedParams) {
     mouseResetTimer = setTimeout(() => {
       mouseResetTimer = null;
       if (mainWindow && !mainWindow.isDestroyed()) {
+        // Restore to normal hit-test mode
         mainWindow.setIgnoreMouseEvents(true, { forward: true });
 
-        // Restore main window z-order to default when no effects active
         if (activeEffectWindows.size === 0) {
-          mainWindow.setAlwaysOnTop(true);
           stopEffectHitTestPolling();
+          // Notify renderer that effects are done — resume normal hit-test
+          mainWindow.webContents.send('effect-active', false);
         }
 
-        // Send cursor position to renderer using relX/relY from the
-        // global mouse tracker (DPI-safe, already in CSS coordinates).
-        // We compute it here from screen coordinates, but the renderer
-        // also caches positions from the global-mouse IPC which is more
-        // reliable on high-DPI displays.
+        // Send cursor position for synthetic hit-test
         try {
           const cursor = screen.getCursorScreenPoint();
           const bounds = mainWindow.getBounds();
@@ -621,8 +641,14 @@ ipcMain.on('resize-window', (event, { width, height }) => {
 
 ipcMain.on('set-ignore-mouse', (event, { ignore, options }) => {
   if (mainWindow && !mainWindow.isDestroyed()) {
+    console.log(`[MAIN] setIgnoreMouseEvents(${ignore}, ${JSON.stringify(options)})`);
     mainWindow.setIgnoreMouseEvents(ignore, options || {});
   }
+});
+
+// Debug: pipe renderer console.log to main process terminal
+ipcMain.on('renderer-log', (event, msg) => {
+  console.log(`[RENDERER] ${msg}`);
 });
 
 // Rename dialog — opens a separate small window so main window stays frameless
@@ -785,6 +811,37 @@ app.whenReady().then(() => {
   Menu.setApplicationMenu(null);
   createMainWindow();
   startSystemMonitor();
+
+  // === AUTO TEST MODE ===
+  // Trigger a big effect after 6 seconds, then check state
+  if (process.argv.includes('--test-mouse')) {
+    console.log('\n=== MOUSE TEST MODE ===');
+    console.log('Will auto-trigger big effect in 6 seconds...');
+
+    setTimeout(() => {
+      console.log('[TEST] Triggering big effect "giant"...');
+      const result = runBigEffect('giant', { duration: 3000 });
+      console.log('[TEST] runBigEffect result:', result);
+
+      // After 1 second, check the state
+      setTimeout(() => {
+        console.log('[TEST] === STATE CHECK AFTER EFFECT START ===');
+        console.log('[TEST] activeEffectWindows:', activeEffectWindows.size);
+        if (mainWindow && !mainWindow.isDestroyed()) {
+          console.log('[TEST] mainWindow.isAlwaysOnTop():', mainWindow.isAlwaysOnTop());
+        }
+
+        // After effect should be done (3s + 3s buffer = 6s), check again
+        setTimeout(() => {
+          console.log('[TEST] === STATE CHECK AFTER EFFECT SHOULD BE DONE ===');
+          console.log('[TEST] activeEffectWindows:', activeEffectWindows.size);
+          if (mainWindow && !mainWindow.isDestroyed()) {
+            console.log('[TEST] mainWindow.isAlwaysOnTop():', mainWindow.isAlwaysOnTop());
+          }
+        }, 7000);
+      }, 1000);
+    }, 6000);
+  }
 
   // Handle display changes: resolution change, monitor add/remove, remote desktop switch
   screen.on('display-metrics-changed', () => {
