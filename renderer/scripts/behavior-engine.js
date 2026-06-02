@@ -1,9 +1,9 @@
 class BehaviorEngine {
-  constructor(hiddenState, renderer, registry, screenWalker) {
+  constructor(hiddenState, renderer, registry, actionController) {
     this.hiddenState = hiddenState;
     this.renderer = renderer;
     this.registry = registry;
-    this.screenWalker = screenWalker;
+    this.actionController = actionController;
     this._cooldowns = {};
     this._lastEasterEgg = {};
     this._lastBubbleTime = 0;
@@ -42,28 +42,46 @@ class BehaviorEngine {
   }
 
   async _triggerRandomFx() {
-    let effects = Array.isArray(window.BIG_EFFECTS) ? window.BIG_EFFECTS : [];
-    if (!effects.length && typeof BIG_EFFECTS !== 'undefined' && Array.isArray(BIG_EFFECTS)) {
-      effects = BIG_EFFECTS;
-    }
-    if (!effects.length && window.petAPI?.listBigEffects) {
-      try {
-        effects = await window.petAPI.listBigEffects();
-        window.BIG_EFFECTS = effects;
-        if (typeof BIG_EFFECTS !== 'undefined') BIG_EFFECTS = effects;
-      } catch (err) {
-        console.warn('[random-fx] failed to refresh effect list', err);
-      }
-    }
+    const effects = await this._getAvailableBigEffects();
     if (!effects.length) return false;
 
     const effect = effects[Math.floor(Math.random() * effects.length)];
-    const result = await window.petAPI.runBigEffect(effect.id);
+    const result = await this._runBigEffectSummary(effect);
+    if (!result) return false;
+    console.log(`[random-fx] triggered ${effect.id}`);
+    return true;
+  }
+
+  async _getAvailableBigEffects() {
+    let effects = [];
+    if (this.actionController?.effectController) {
+      try {
+        effects = await this.actionController.effectController.loadEffects();
+      } catch (err) {
+        console.warn('[big-fx] failed to refresh effect list', err);
+      }
+    }
+
+    if (effects.length) {
+      window.BIG_EFFECTS = effects;
+      if (typeof BIG_EFFECTS !== 'undefined') BIG_EFFECTS = effects;
+    }
+    const available = effects.filter(effect => effect && effect.id);
+    window.petAPI.logInteraction?.('big-effect-list', {
+      source: 'renderer',
+      state: this.actionController?.getState?.() || null,
+      details: { count: available.length, ids: available.map(effect => effect.id) }
+    });
+    return available;
+  }
+
+  async _runBigEffectSummary(effect, params = {}) {
+    if (!this.actionController) return false;
+    const result = await this.actionController.runBigEffect(effect, params, 'behavior');
     if (result && result.success === false) {
-      console.warn('[random-fx] failed to run effect', effect.id, result.error);
+      console.warn('[big-fx] failed to run effect', effect.id, result.error);
       return false;
     }
-    console.log(`[random-fx] triggered ${effect.id}`);
     if (effect.petAnimation) {
       this.renderer.setAnimationOverride(effect.petAnimation, effect.petAnimDuration || 3000);
     }
@@ -71,6 +89,12 @@ class BehaviorEngine {
       this.renderer.spawnParticles(effect.petParticles[0], effect.petParticles[1]);
     }
     return true;
+  }
+
+  async _runBigEffectById(id, params = {}) {
+    const effects = await this._getAvailableBigEffects();
+    const effect = effects.find(item => item.id === id) || { id };
+    return this._runBigEffectSummary(effect, params);
   }
 
   _tick() {
@@ -234,8 +258,9 @@ class BehaviorEngine {
     this._lastActionTime = Date.now();
     switch (type) {
       case 'walk':
-        if (this.screenWalker) this.screenWalker.walkToRandomPosition();
-        this.renderer.setAnimationOverride('walking', 6000);
+        this.actionController?.requestWalk('behavior:walk').then((started) => {
+          if (started) this.renderer.setAnimationOverride('walking', 6000);
+        });
         if (Math.random() < 0.3) {
           const walkLines = ['出去走走~', '散步散步。', '到处看看。', '遛弯去~', '探索新领地！'];
           this._showBubble(walkLines[Math.floor(Math.random() * walkLines.length)], 3000);
@@ -274,6 +299,14 @@ class BehaviorEngine {
   _showBubble(text, duration) {
     this._lastBubbleTime = Date.now();
     this.renderer.showBubble(text, duration || 4000);
+  }
+
+  stopMovementForUser() {
+    this.actionController?.stopMovementForUser('behavior:stopMovementForUser');
+    this._lastActionTime = Date.now();
+    if (this.renderer.currentAnimation === 'walking') {
+      this.renderer.clearAnimationOverride();
+    }
   }
 
   _checkEasterEggs(state, sys, now) {
@@ -355,20 +388,21 @@ class BehaviorEngine {
         this.renderer.setAnimationOverride('surprised', 3000);
         break;
       case 'giant_face':
-        window.petAPI.runBigEffect('giant', { duration: 4000 });
+        this._runBigEffectById('giant', { duration: 4000 });
         break;
       case 'care_rain':
         this._showBubble(pickRandomSpeech('stressed_concern'), 4000);
         this.renderer.spawnParticles('heart', 5);
-        window.petAPI.runBigEffect('care-rain', {
+        this._runBigEffectById('care-rain', {
           messages: ['今天也辛苦啦。', '慢慢来。', '记得休息。', 'You are doing great.', 'おつかれさま。', '我在陪着你。'],
           duration: 8000,
           opacity: 0.65
         });
         break;
       case 'patrol':
-        if (this.screenWalker) this.screenWalker.walkToRandomPosition();
-        this.renderer.setAnimationOverride('walking', 8000);
+        this.actionController?.requestWalk('easter-egg:patrol').then((started) => {
+          if (started) this.renderer.setAnimationOverride('walking', 8000);
+        });
         this._showBubble('巡视领地中~', 3000);
         break;
       case 'peek':
@@ -391,7 +425,7 @@ class BehaviorEngine {
         this._showBubble(pickRandomSpeech('long_companion'), 5000);
         break;
       case 'fireworks':
-        window.petAPI.runBigEffect('fireworks', { duration: 12000 });
+        this._runBigEffectById('fireworks', { duration: 12000 });
         this.renderer.spawnParticles('sparkle', 15);
         this.renderer.spawnParticles('star', 10);
         this._showBubble('新年快乐！', 5000);
@@ -412,7 +446,7 @@ class BehaviorEngine {
       // Giant face effect picks a random kaomoji and uses the requested color.
       const colors = ['#f9a8d4', '#818cf8', '#f87171', '#86efac', '#fde68a', '#c084fc', '#fb923c', '#f472b6', '#a3e635'];
       const color = colors[Math.floor(Math.random() * colors.length)];
-      window.petAPI.runBigEffect('giant', { color, duration: 3500 });
+      this._runBigEffectById('giant', { color, duration: 3500 });
       this.renderer.setAnimationOverride('surprised', 3000);
     } else {
       // Mini burst: particles + surprised expression even at low mischief
@@ -423,73 +457,7 @@ class BehaviorEngine {
     }
   }
 
-  triggerBigEffect() {
-    // 30% chance each time (called on every click after 10+ combo)
-    if (Math.random() > 0.3) return;
-
-    const effects = [
-      () => {
-        // Giant face effect picks a random kaomoji and uses the requested color.
-        const colors = ['#f9a8d4', '#818cf8', '#f87171', '#86efac', '#fde68a', '#c084fc', '#fb923c', '#e879f9', '#67e8f9'];
-        const color = colors[Math.floor(Math.random() * colors.length)];
-        window.petAPI.runBigEffect('giant', { color, duration: 3500 });
-        this.renderer.setAnimationOverride('surprised', 3000);
-      },
-      () => {
-        // Care rain
-        window.petAPI.runBigEffect('care-rain', {
-          messages: typeof CARE_MESSAGES !== 'undefined' ? CARE_MESSAGES : ['记得休息。', 'You are doing great.', 'おつかれさま。'],
-          duration: 10000,
-          opacity: 0.75
-        });
-        this.renderer.spawnParticles('heart', 6);
-        this.renderer.setAnimationOverride('love', 3000);
-        this._showBubble(pickRandomSpeech('stressed_concern'), 4000);
-      },
-      () => {
-        // Firework burst
-        this.renderer.spawnParticles('sparkle', 15);
-        this.renderer.spawnParticles('star', 10);
-        this.renderer.setAnimationOverride('happy', 3000);
-        this._showBubble('好开心！', 3000);
-        this.renderer.triggerScreenFlash('#fde68a');
-      },
-      () => {
-        // Barrage attack
-        this.renderer.spawnParticles('exclaim', 8);
-        this.renderer.spawnParticles('star', 6);
-        this.renderer.setAnimationOverride('surprised', 3000);
-        this._showBubble('轰炸！！', 3000);
-      },
-      () => {
-        // Affection burst + jump
-        this.renderer.spawnParticles('heart', 10);
-        this.renderer.setAnimationOverride('love', 3000);
-        this._showBubble('最喜欢你了！', 4000);
-        setTimeout(() => {
-          if (this.screenWalker) this.screenWalker.jumpToRandomPosition();
-        }, 1500);
-      },
-      () => {
-        // Wholesome cat face
-        this.renderer.spawnParticles('heart', 5);
-        this.renderer.setAnimationOverride('wholesome', 3000);
-        this._showBubble('喵呜~', 3000);
-      },
-      () => {
-        // Sneaky cat face
-        this.renderer.spawnParticles('sparkle', 4);
-        this.renderer.setAnimationOverride('sneaky', 3000);
-        this._showBubble('嘿嘿~', 3000);
-      },
-      () => {
-        // Shocked/amazed
-        this.renderer.spawnParticles('exclaim', 6);
-        this.renderer.setAnimationOverride('amazed', 3000);
-        this._showBubble('！！！', 2500);
-      }
-    ];
-
-    effects[Math.floor(Math.random() * effects.length)]();
+  async triggerBigEffect() {
+    await this.actionController?.triggerRandomBigEffect('behavior:triggerBigEffect');
   }
 }

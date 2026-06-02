@@ -240,14 +240,14 @@ class PetDataRegistry {
 
 /**
  * ActivityRunner — 执行预设活动步骤
- * 接收 registry + renderer + pet + screenWalker，按步骤编排执行
+ * 接收 registry + renderer + pet + actionController，按步骤编排执行
  */
 class ActivityRunner {
-  constructor(registry, renderer, pet, screenWalker) {
+  constructor(registry, renderer, pet, actionController) {
     this.registry = registry;
     this.renderer = renderer;
     this.pet = pet;
-    this.screenWalker = screenWalker;
+    this.actionController = actionController;
     this._activeTimers = [];
   }
 
@@ -314,11 +314,11 @@ class ActivityRunner {
         break;
 
       case 'walk':
-        this.screenWalker.walkToRandomPosition();
+        this.actionController?.requestWalk('activity:walk');
         break;
 
       case 'jump':
-        this.screenWalker.jumpToRandomPosition();
+        this.actionController?.movementController?.jumpToRandomPosition('activity:jump');
         break;
 
       case 'toast':
@@ -354,7 +354,7 @@ class ActivityRunner {
       case 'prank': {
         const stage = this.pet.stage || 'adult';
         const kaomoji = this.registry.getEvolutionSprite(stage, 'default');
-        window.petAPI.prankGiant(kaomoji, params.duration || 3000);
+        this.actionController?.runBigEffect('giant', { kaomoji, duration: params.duration || 3000 }, 'activity:prank');
         break;
       }
 

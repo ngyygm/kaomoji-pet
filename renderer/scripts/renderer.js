@@ -971,67 +971,6 @@ class NaturalBlink {
   }
 }
 
-// === Screen Walker — manages walking across the screen ===
-
-class ScreenWalker {
-  constructor(renderer) {
-    this.renderer = renderer;
-    this.isWalking = false;
-    this.walkDoneCallback = null;
-
-    window.petAPI.onWalkDone(() => {
-      this.isWalking = false;
-      if (this.walkDoneCallback) this.walkDoneCallback();
-    });
-  }
-
-  async walkToRandomPosition() {
-    if (this.isWalking) return;
-
-    const screen = await window.petAPI.getScreenSize();
-    const winSize = await window.petAPI.getWindowSize();
-    if (!screen || !winSize) return;
-    // Guard: screen asleep/disconnected returns {0,0}
-    if (!screen.width || !screen.height) return;
-
-    const padding = 20;
-    const targetX = padding + Math.random() * (screen.width - winSize.width - padding * 2);
-    const targetY = padding + Math.random() * (screen.height - winSize.height - padding * 2);
-
-    const curveTypes = ['sine', 'bezier', 'arc', 'linear', 'sine', 'bezier'];
-    const curveType = curveTypes[Math.floor(Math.random() * curveTypes.length)];
-
-    this.isWalking = true;
-    window.petAPI.moveWindowTo(Math.round(targetX), Math.round(targetY), curveType);
-  }
-
-  async jumpToRandomPosition() {
-    const screen = await window.petAPI.getScreenSize();
-    const winSize = await window.petAPI.getWindowSize();
-    if (!screen || !winSize) return;
-    // Guard: screen asleep/disconnected returns {0,0}
-    if (!screen.width || !screen.height) return;
-
-    // Play disappear animation
-    this.renderer.playJumpDisappear();
-
-    await new Promise(r => setTimeout(r, 350));
-
-    const padding = 50;
-    const targetX = padding + Math.random() * (screen.width - winSize.width - padding * 2);
-    const targetY = padding + Math.random() * (screen.height - winSize.height - padding * 2);
-
-    // Move window instantly
-    window.petAPI.stopWalk();
-    window.petAPI.moveWindowTo(Math.round(targetX), Math.round(targetY), 9999);
-
-    await new Promise(r => setTimeout(r, 50));
-
-    // Play appear animation
-    this.renderer.playJumpAppear();
-  }
-}
-
 // === Micro-expression definitions ===
 
 const MICRO_EXPRESSIONS = {

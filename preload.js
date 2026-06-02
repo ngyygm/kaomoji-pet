@@ -1,28 +1,50 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
+function on(channel, callback) {
+  ipcRenderer.on(channel, (event, data) => callback(data));
+}
+
 contextBridge.exposeInMainWorld('petAPI', {
-  moveWindow: (deltaX, deltaY) => ipcRenderer.send('window-move', { deltaX, deltaY }),
-  setWindowPosition: (x, y) => ipcRenderer.send('set-window-position', { x, y }),
-  moveWindowTo: (targetX, targetY, curveType) => ipcRenderer.send('move-window-to', { targetX, targetY, curveType }),
-  stopWalk: () => ipcRenderer.send('stop-walk'),
-  getScreenSize: () => ipcRenderer.invoke('get-screen-size'),
-  getWindowPosition: () => ipcRenderer.invoke('get-window-position'),
-  getWindowSize: () => ipcRenderer.invoke('get-window-size'),
-  resizeWindow: (width, height) => ipcRenderer.send('resize-window', { width, height }),
-  setIgnoreMouseEvents: (ignore, options) => ipcRenderer.send('set-ignore-mouse', { ignore, options }),
-  saveData: (data) => ipcRenderer.send('save-data', data),
-  loadData: () => ipcRenderer.invoke('load-data'),
-  closeApp: () => ipcRenderer.send('close-app'),
-  onAppClosing: (callback) => ipcRenderer.on('app-closing', () => callback()),
-  onGlobalMouse: (callback) => ipcRenderer.on('global-mouse', (event, data) => callback(data)),
-  onSystemMetrics: (callback) => ipcRenderer.on('system-metrics', (event, data) => callback(data)),
-  onWalkDone: (callback) => ipcRenderer.on('walk-done', () => callback()),
-  prankGiant: (kaomoji, duration) => ipcRenderer.send('prank-giant', { kaomoji, duration }),
+  getWindowState: () => ipcRenderer.invoke('window:getState'),
+  getScreenSize: () => ipcRenderer.invoke('window:getScreenSize'),
+  getWindowPosition: () => ipcRenderer.invoke('window:getPosition'),
+  getWindowSize: () => ipcRenderer.invoke('window:getSize'),
+  setWindowPosition: (x, y) => ipcRenderer.invoke('window:setPosition', { x, y }),
+  resizeWindow: (width, height) => ipcRenderer.invoke('window:setSize', { width, height }),
+  moveWindowTo: (targetX, targetY, curveType) => ipcRenderer.invoke('window:moveTo', { targetX, targetY, curveType }),
+  stopMovement: (reason) => ipcRenderer.invoke('window:stopMovement', { reason }),
+
+  getSystemSnapshot: () => ipcRenderer.invoke('system:getSnapshot'),
+  onSystemMetrics: (callback) => on('system:metrics', callback),
+  onGlobalMouse: (callback) => on('system:global-mouse', callback),
+  onMovementDone: (callback) => on('window:movement-done', callback),
+  onMovementStopped: (callback) => on('window:movement-stopped', callback),
+
+  listBigEffects: () => ipcRenderer.invoke('effects:list'),
+  runBigEffect: (id, params) => ipcRenderer.invoke('effects:run', { id, params }),
+  onEffectStarted: (callback) => on('effects:started', callback),
+  onEffectClosed: (callback) => on('effects:closed', callback),
+
+  saveData: (data) => ipcRenderer.invoke('save:write', data),
+  loadData: () => ipcRenderer.invoke('save:load'),
+  logInteraction: (event, payload = {}) => ipcRenderer.send('log:write', {
+    event,
+    source: payload.source || 'renderer',
+    state: payload.state || null,
+    details: payload.details || null
+  }),
+  closeApp: () => ipcRenderer.send('app:close'),
+  onAppClosing: (callback) => on('app:closing', callback),
+  showRenameDialog: (currentName) => ipcRenderer.invoke('dialog:rename', currentName),
   getGpuStatus: () => ipcRenderer.invoke('gpu:status'),
-  listBigEffects: () => ipcRenderer.invoke('big-effects:list'),
-  runBigEffect: (id, params) => ipcRenderer.invoke('big-effects:run', { id, params }),
-  showRenameDialog: (currentName) => ipcRenderer.invoke('show-rename-dialog', currentName),
-  onMouseStateReset: (callback) => ipcRenderer.on('mouse-state-reset', (event, data) => callback(data)),
-  onEffectHitTest: (callback) => ipcRenderer.on('effect-hit-test', (event, data) => callback(data)),
-  onEffectActive: (callback) => ipcRenderer.on('effect-active', (event, active) => callback(active))
+
+  // Compatibility aliases while renderer modules are being migrated.
+  stopWalk: () => ipcRenderer.invoke('window:stopMovement', { reason: 'legacy-stopWalk' }),
+  onWalkDone: (callback) => on('window:movement-done', callback),
+  moveWindow: (deltaX, deltaY) => {
+    ipcRenderer.invoke('window:getPosition').then((pos) => {
+      if (!pos) return;
+      ipcRenderer.invoke('window:setPosition', { x: pos.x + deltaX, y: pos.y + deltaY });
+    });
+  }
 });
