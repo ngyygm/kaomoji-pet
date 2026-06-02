@@ -2,7 +2,7 @@
   "name": "kaomoji-pet",
   "version": "1.0.0",
   "description": "颜文字桌面宠物 - 可爱的猫系桌宠",
-  "main": "main.js",
+  "main": "main/main.js",
   "scripts": {
     "start": "electron .",
     "dev": "electron . --dev",

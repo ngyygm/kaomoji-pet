@@ -6,12 +6,12 @@ const path = require('path');
 app.commandLine.appendSwitch('ignore-gpu-blocklist');
 app.commandLine.appendSwitch('enable-gpu-rasterization');
 app.commandLine.appendSwitch('enable-zero-copy');
-const { Logger } = require('./main/services/logger');
-const { WindowService } = require('./main/services/window-service');
-const { MovementService } = require('./main/services/movement-service');
-const { EffectService } = require('./main/services/effect-service');
-const { SystemService } = require('./main/services/system-service');
-const { SaveService } = require('./main/services/save-service');
+const { Logger } = require('./services/logger');
+const { WindowService } = require('./services/window-service');
+const { MovementService } = require('./services/movement-service');
+const { EffectService } = require('./services/effect-service');
+const { SystemService } = require('./services/system-service');
+const { SaveService } = require('./services/save-service');
 
 let logger, windowService, movementService, effectService, systemService, saveService;
 
