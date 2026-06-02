@@ -176,6 +176,17 @@ function createEffectWindow(effect, resolvedParams) {
   }
 
   effectWin.loadFile(effect.entryPath);
+  effectWin.webContents.on('did-finish-load', () => {
+    const payload = {
+      id: effect.id,
+      duration: resolvedParams.duration,
+      params: resolvedParams
+    };
+    effectWin.webContents.send('effect:start', payload);
+    if (effect.startChannel) {
+      effectWin.webContents.send(effect.startChannel, resolvedParams);
+    }
+  });
 
   effectWin.on('closed', () => {
     if (activeEffectWindows.get(effect.id) === effectWin) {
