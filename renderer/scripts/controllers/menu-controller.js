@@ -16,6 +16,15 @@ class MenuController {
     this.renderMain();
     document.addEventListener('contextmenu', this.onContextMenu);
     this.menuEl.addEventListener('click', this.onMenuClick);
+
+    // 托盘改名结果回调
+    window.petAPI.onTrayRenameResult((newName) => {
+      if (!newName) return;
+      this.petState.name = newName;
+      this.renderer.showBubble(`我叫${newName}！喵~`, 3000);
+      this.renderer.spawnParticles('heart', 5);
+      this.saveManager.saveFull(this.petState, this.hiddenState.getState());
+    });
   }
 
   async onContextMenu(e) {

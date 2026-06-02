@@ -36,5 +36,6 @@ contextBridge.exposeInMainWorld('petAPI', {
   closeApp: () => ipcRenderer.send('app:close'),
   onAppClosing: (callback) => on('app:closing', callback),
   showRenameDialog: (currentName) => ipcRenderer.invoke('dialog:rename', currentName),
+  onTrayRenameResult: (callback) => on('tray:rename-result', callback),
   getGpuStatus: () => ipcRenderer.invoke('gpu:status')
 });

@@ -1,5 +1,6 @@
 const { app, Menu, ipcMain, BrowserWindow, screen, powerMonitor } = require('electron');
 const path = require('path');
+const { TrayService } = require('./services/tray-service');
 
 // GPU acceleration — Chromium will auto-fallback to software rendering if no GPU
 // These MUST be set before app.whenReady()
@@ -13,7 +14,7 @@ const { EffectService } = require('./services/effect-service');
 const { SystemService } = require('./services/system-service');
 const { SaveService } = require('./services/save-service');
 
-let logger, windowService, movementService, effectService, systemService, saveService;
+let logger, windowService, movementService, effectService, systemService, saveService, trayService;
 
 app.whenReady().then(() => {
   // Fix GPU shader cache permission error on Windows
@@ -27,6 +28,8 @@ app.whenReady().then(() => {
   effectService = new EffectService({ windowService, logger });
   systemService = new SystemService({ windowService, logger });
   saveService = new SaveService({ app, logger });
+  trayService = new TrayService({ windowService, movementService, systemService, saveService, logger });
+  trayService.setRenameFn(showRenameDialog);
 
   // Register IPC handlers — each service owns its own channels
   windowService.registerIpc();
@@ -37,6 +40,7 @@ app.whenReady().then(() => {
   registerGlobalIpc();
 
   windowService.createMainWindow();
+  trayService.createTray();
   systemService.start();
   logger.write('ipc-ready', 'main');
 });
@@ -48,6 +52,7 @@ function registerGlobalIpc() {
   });
 
   ipcMain.on('app:close', () => {
+    trayService.isQuitting = true; // 渲染进程退出也要真正退出
     movementService.stop('app-close');
     systemService.stop();
     windowService.closeApp(app);
@@ -70,14 +75,14 @@ function showRenameDialog(currentName) {
 
     const renameWin = new BrowserWindow({
       title: ' ', width: rw, height: rh, x: rx, y: ry,
-      frame: false, titleBarStyle: 'hidden', transparent: true,
+      frame: false, transparent: true,
       resizable: false, alwaysOnTop: true, skipTaskbar: true,
-      autoHideMenuBar: true, hasShadow: false,
+      hasShadow: false,
       backgroundColor: '#00000000', focusable: true, show: false,
       webPreferences: { nodeIntegration: true, contextIsolation: false }
     });
 
-    renameWin.setMenuBarVisibility(false);
+    renameWin.removeMenu();
     renameWin.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(`
       <style>
         * { margin:0; padding:0; box-sizing:border-box; }
@@ -138,14 +143,19 @@ try {
   });
 } catch (_) {}
 
-app.on('window-all-closed', () => {
+app.on('window-all-closed', (e) => {
   movementService?.stop('window-all-closed');
   systemService?.stop();
-  app.quit();
+  // 如果是托盘退出，则真正退出；否则只关闭窗口，保留托盘
+  if (trayService?.getQuitting()) {
+    app.quit();
+  }
+  // 否则保持托盘运行，不退出
 });
 
 app.on('before-quit', () => {
   movementService?.stop('before-quit');
   systemService?.stop();
   windowService?.send('app:closing');
+  trayService?.destroy();
 });
