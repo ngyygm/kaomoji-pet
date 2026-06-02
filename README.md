@@ -1,32 +1,54 @@
-# Kaomoji Pet / 颜文字桌宠 / 顔文字ペット
+# Kaomoji Pet / 颜文字桌宠 / 顔文字ペット ฅ^•ﻌ•^ฅ
 
-A cute, AI-driven desktop pet that lives on your screen as a kaomoji (Japanese text emoticon). It reacts to your computer's state — CPU load, memory usage, battery level, time of day, and your mouse activity — to express emotions, wander around, and even send you encouraging messages.
+一只住在桌面上的颜文字猫咪桌宠 (◕‿◕)✧
 
-一只住在桌面上的颜文字猫咪桌宠。它会感知电脑状态（CPU、内存、电量、时间、鼠标活动），用表情、动作、说话来表达情绪，还能下"鼓励雨"陪你。
+它会感知电脑状态——CPU、内存、电量、时间、鼠标活动，用表情、动作、说话来表达情绪，偶尔还会放烟花陪你 (ﾉ◕ヮ◕)ﾉ*:・ﾟ✧
 
-画面上に住む顔文字ネコのデスクトップペット。PCの状態（CPU、メモリ、バッテリー、時間、マウス活動）を感知し、表情や動き、セリフで感情を表現します。
-
----
-
-## Features / 特性 / 機能
-
-- **Living Kaomoji** — `( · ω · )` that changes expressions based on mood
-- **Hidden State Engine** — 10 internal attributes (energy, mood, curiosity, sleepiness, stress, warmth, mischief, hunger, loneliness, focus sync) that evolve over time
-- **30+ Expressions** — Eyes, mouth, and body change to reflect the pet's emotional state
-- **Screen Walking** — The pet wanders across your screen with curved paths and natural pacing
-- **Speech Bubbles** — Contextual dialogue based on system state and time of day
-- **Care Rain** — 300 encouragement messages in 6 languages (中文, English, 日本語, Français, Deutsch, Русский) falling like rain when you're stressed
-- **Easter Eggs** — Rapid clicks trigger surprises (giant face, firework burst, barrage attack, affection burst)
-- **Time-aware** — Morning greetings, afternoon drowsiness, late-night sleepiness
-- **System-aware** — Reacts to CPU load, memory pressure, battery level, charging state
-- **Mouse-aware** — Follows cursor, reacts when you approach, responds to your activity
-- **Auto Save** — Pet state persists between sessions
+画面上に住む顔文字ネコのデスクトップペット。PCの状態を感知し、表情や動き、セリフで感情を表現します ✿
 
 ---
 
-## Quick Start for Windows Users / Windows 用户直接使用
+## ✨ 特性
 
-如果你是 Windows 用户，不需要安装 Node.js 或任何开发环境，直接下载即可使用：
+- **活生生的颜文字** — `( · ω · )` 会根据心情变化表情 ~(‾▽‾)~
+- **隐藏状态引擎** — 10 个内部属性（精力、心情、好奇心、困意、压力、亲近感、捣蛋欲、饥饿感、孤独感、专注同步）随时间演化
+- **30+ 表情** — 眼睛、嘴巴、身体都会随情绪变化
+- **屏幕散步** — 小猫在屏幕上自由溜达，路径自然流畅
+- **对话气泡** — 根据系统状态和时间说话，偶尔吐槽你的 CPU ᕙ(⇀‸↼‶)ᕗ
+- **关怀雨** — 300 条鼓励语，6 种语言（中文/English/日本語/Français/Deutsch/Русский），在你忙碌时轻轻落下 ♡
+- **13 种全屏特效** — 烟花、弹幕、龙卷风、星座连线等颜文字特效（见下方列表）
+- **颜文字烟花大会** — 8 种 burst 类型（菊花、牡丹、柳、心形、双环、满天星、瀑布二次炸、樱花散落），150+ 颜文字字符池
+- **彩蛋** — 快速点击触发惊喜（大脸、烟花、弹幕攻击、爱心爆发）
+- **时间感知** — 早安问候、下午犯困、深夜打瞌睡 ( z ω z )
+- **系统感知** — CPU 忙了会紧张、内存满了会迷糊、电量低了会没精神
+- **鼠标感知** — 跟随光标、靠近会反应、点击会互动
+- **自动存档** — 宠物状态在会话间持久化
+
+---
+
+## 🎆 全屏特效一览
+
+| 特效 | Emoji | 说明 |
+|---|---|---|
+| 烟花大会 | 🎆 | 8 种颜文字烟花 burst，混合渲染保帧率 |
+| 关怀雨 | 🌧 | 全屏飘落鼓励文字 |
+| 随机大脸 | 😱 | 全屏随机巨大颜文字 |
+| 弹幕华尔兹 | 💫 | 全屏弹幕轨迹特效 |
+| 太空侵略者 | 👾 | 太空侵略者风格颜文字阵列 |
+| 流星许愿夜 | 🌠 | 颜文字坐在夜空下看流星划过 |
+| 星座连线 | 🌌 | 颜文字星点自动连成星座图案 |
+| 颜文字大阅兵 | 🎖 | 颜文字队伍横穿屏幕 |
+| 龙卷风 | 🌪 | 全屏颜文字龙卷风 |
+| 台球弹跳 | 🎉 | 颜文字台球弹跳 |
+| 黑洞吸猫 | 🕳 | 颜文字和星光被黑洞吸入再喷出 |
+| 传送门乱跳 | 🌀 | 颜文字在传送门之间跳跃弹出 |
+| 打字机风暴 | ⌨ | 字符像打字机敲出再被风吹散 |
+
+---
+
+## 🚀 Windows 用户直接使用
+
+不需要安装任何开发环境，下载即用 (≧◡≦)
 
 1. 前往 [Releases 页面](https://github.com/ngyygm/kaomoji-pet/releases)
 2. 下载最新的 `kaomoji-pet-win32-x64.zip`
@@ -37,98 +59,101 @@ A cute, AI-driven desktop pet that lives on your screen as a kaomoji (Japanese t
 
 ---
 
-## Development / 开发 / 開発
+## 🛠 开发
 
 ```bash
-# Install dependencies
+# 安装依赖
 npm install
 
-# Run in development mode
+# 开发模式运行
 npm start
 
-# Build for Windows
+# 打包 Windows 版本
 npm run build:win
 ```
 
-Output will be in `dist/kaomoji-pet-win32-x64/`. Copy the entire folder to another PC and double-click `kaomoji-pet.exe`.
-
-打包产物在 `dist/kaomoji-pet-win32-x64/`，整个文件夹拷贝到别的电脑，双击 `kaomoji-pet.exe` 即可运行。
-
-ビルド結果は `dist/kaomoji-pet-win32-x64/` に出力されます。フォルダ全体を別のPCにコピーして、`kaomoji-pet.exe` をダブルクリックして起動。
-
 ---
 
-## Interactions / 交互操作 / 操作方法
+## 🎮 交互操作
 
-| Action | Effect |
+| 操作 | 效果 |
 |---|---|
-| **Double-click** kaomoji | Pet the cat (hearts + affection) |
-| **Rapid click** 10+ times | Trigger big surprise effect |
-| **Drag** kaomoji | Move window |
-| **Right-click** | Context menu (rename, save, exit) |
-| **Mouse nearby** | Pet notices and reacts |
+| **双击** 颜文字 | 摸摸猫（爱心 + 亲近感上升）♡ |
+| **快速点击** 10 次以上 | 触发大惊喜特效 ✨ |
+| **拖拽** 颜文字 | 移动窗口位置 |
+| **右键** | 上下文菜单（改名、存档、退出）|
+| **鼠标靠近** | 小猫会注意到你并做出反应 ( ° ω ° ) |
 
 ---
 
-## Architecture / 架构
+## 🏗 项目结构
 
 ```
 kaomoji-pet/
-├── main.js                    # Electron main process
-├── preload.js                 # IPC bridge
-├── renderer/
-│   ├── index.html             # Main UI
-│   ├── effects/               # Drop-in big effect folders
-│   │   ├── README.md          # Effect folder specification
-│   │   ├── _template/         # Copy this to create a new effect
-│   │   └── <effect-id>/       # effect.json + index.html + optional assets
-│   ├── styles/main.css        # Styles
-│   └── scripts/
-│       ├── app.js             # App entry
-│       ├── hidden-state.js    # Hidden state engine
-│       ├── behavior-engine.js # Behavior logic
-│       ├── renderer.js        # Kaomoji rendering
-│       ├── system-monitor.js  # System metrics
-│       └── data/              # Expression/speech/particle definitions
-├── package.json
-└── BLUEPRINT.md               # Full design document
+├── main/                      # Electron 主进程
+│   ├── main.js                # 主进程入口
+│   ├── preload.js             # IPC 桥接
+│   └── services/              # 业务服务层
+│       ├── window-service.js  # 窗口管理
+│       ├── movement-service.js# 移动服务
+│       ├── effect-service.js  # 特效服务
+│       ├── system-service.js  # 系统监控
+│       ├── save-service.js    # 存档服务
+│       └── logger.js          # 日志服务
+├── renderer/                  # 渲染进程
+│   ├── index.html             # 主 UI
+│   ├── effects/               # 特效目录（即插即用）
+│   │   ├── _shared/           # 共享运行时（sprite 缓存、自适应画质）
+│   │   ├── _template/         # 复制此模板创建新特效
+│   │   └── <effect-id>/       # effect.json + index.html
+│   ├── styles/                # 样式
+│   └── scripts/               # 渲染逻辑
+│       ├── app.js             # 应用入口
+│       ├── hidden-state.js    # 隐藏状态引擎
+│       ├── behavior-engine.js # 行为逻辑
+│       ├── renderer.js        # 颜文字渲染
+│       ├── system-monitor.js  # 系统指标
+│       └── data/              # 表情/台词/粒子定义
+├── docs/                      # 文档
+│   └── BLUEPRINT.md           # 完整设计文档
+├── 颜文字/                    # 颜文字资源
+├── kaomoji-start.bat          # Windows 启动脚本
+└── package.json               # 入口指向 main/main.js
 ```
 
 ---
 
-## Expressions / 表情
+## 表情系统 ฅ(・ω・ฅ)
 
-The pet has a segmented kaomoji system: `( X ω X )` where `X` positions are dynamically replaced.
+小猫使用分段颜文字系统：`( X ω X )`，其中 `X` 位置动态替换。
 
-| Mood | Eyes | Mouth |
+| 心情 | 眼睛 | 嘴巴 |
 |---|---|---|
-| Happy | `^` | `ω` |
-| Love | `♥` | `ω` |
-| Sleepy | `-` | `ω` |
-| Sleeping | `─` | `ω` |
-| Surprised | `O` | `▽` |
-| Sad | `;` | `ω` |
-| Angry | `> <` | `ω` |
-| Curious | `°` | `ω` |
-| Confused | `?` | `≈` |
-| Smug | `¬` | `3` |
-| Drowsy | `─` | `o` |
-| Shy | `~` | `─` |
+| 开心 | `^` | `ω` |
+| 恋爱 | `♥` | `ω` |
+| 犯困 | `-` | `ω` |
+| 睡觉 | `─` | `ω` |
+| 惊讶 | `O` | `▽` |
+| 难过 | `;` | `ω` |
+| 生气 | `> <` | `ω` |
+| 好奇 | `°` | `ω` |
+| 困惑 | `?` | `≈` |
+| 得意 | `¬` | `3` |
+| 害羞 | `~` | `─` |
 
 ---
 
-## Design Document / 设计文档
+## 📄 设计文档
 
-See [BLUEPRINT.md](BLUEPRINT.md) for the full design spec of the hidden state system, behavior engine, and interaction model.
-
-详见 [BLUEPRINT.md](BLUEPRINT.md)，包含隐藏状态系统、行为引擎、交互模型等完整设计文档。
+详见 [docs/BLUEPRINT.md](docs/BLUEPRINT.md)，包含隐藏状态系统、行为引擎、交互模型等完整设计文档。
 
 ---
 
-## Tech Stack / 技术栈
+## 🔧 技术栈
 
-- **Electron** — Desktop application framework
-- **Vanilla JS** — Lightweight, no framework overhead
+- **Electron** — 桌面应用框架
+- **Vanilla JS** — 轻量无框架，干净利落 ✧
+- **Canvas 2D** — 特效渲染（sprite 缓存 + 自适应画质 + 混合渲染管线）
 
 ## License
 
