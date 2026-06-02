@@ -14,6 +14,7 @@ let cpuSamples = [];
 const activeEffectWindows = new Map();
 let mouseResetTimer = null;
 let effectHitTestTimer = null;
+let effectRaiseTimer = null; // periodic mainWindow.moveTop() during effects
 const MAX_CONCURRENT_EFFECTS = 2;
 
 function configureChromelessWindow(win) {
@@ -126,13 +127,10 @@ function createEffectWindow(effect, resolvedParams) {
   const { width, height } = screen.getPrimaryDisplay().workAreaSize;
   const winConfig = effect.window || {};
 
-  // CRITICAL: Effect window must NOT be alwaysOnTop on Windows.
-  // On Windows, setIgnoreMouseEvents(true) + alwaysOnTop does NOT reliably
-  // pass mouse events to windows below. The only reliable solution is to
-  // make the main pet window (alwaysOnTop) sit ABOVE the effect window,
-  // so the OS routes mouse events to the main window FIRST.
-  // The effect is fullscreen-transparent, so its animation shows through
-  // the main window's transparent areas.
+  // Effect window: fullscreen, transparent, alwaysOnTop so it's visible.
+  // setIgnoreMouseEvents(true) so clicks pass through.
+  // The main pet window will be periodically raised ABOVE this window
+  // so mouse events reach the pet first.
   const effectWin = new BrowserWindow({
     title: ' ',
     width,
@@ -142,14 +140,13 @@ function createEffectWindow(effect, resolvedParams) {
     transparent: true,
     frame: false,
     titleBarStyle: 'hidden',
-    alwaysOnTop: false,
+    alwaysOnTop: winConfig.alwaysOnTop !== false,
     resizable: false,
     focusable: false,
     skipTaskbar: true,
     autoHideMenuBar: true,
     hasShadow: false,
     backgroundColor: '#00000000',
-    show: false,
     webPreferences: {
       nodeIntegration: true,
       contextIsolation: false,
@@ -158,21 +155,22 @@ function createEffectWindow(effect, resolvedParams) {
   });
 
   configureChromelessWindow(effectWin);
-  // setIgnoreMouseEvents(true) without {forward: true} — avoid low-level
-  // hook conflicts with the main window.
   if (winConfig.clickThrough !== false) effectWin.setIgnoreMouseEvents(true);
 
   // Cancel any pending mouse reset — a new effect is starting
   if (mouseResetTimer) { clearTimeout(mouseResetTimer); mouseResetTimer = null; }
 
   // Force main window to capture ALL events during the effect.
-  // Main window is alwaysOnTop, so it's above the effect window.
-  // Mouse events reach main window first → kaomoji stays clickable.
   if (mainWindow && !mainWindow.isDestroyed()) {
     mainWindow.setIgnoreMouseEvents(false);
     mainWindow.moveTop();
-    console.log('[EffectWindow] mainWindow forced to capture mode (ignoreMouseEvents=false)');
+    console.log('[EffectWindow] mainWindow forced to capture mode');
   }
+
+  // Periodically raise main window above the effect window.
+  // On Windows, both are TOPMOST, so we need to keep re-raising the main
+  // window to ensure it stays above the effect window for mouse events.
+  startEffectRaiseTimer();
 
   // Start polling cursor position for hit-test while effects are active
   startEffectHitTestPolling();
@@ -182,24 +180,7 @@ function createEffectWindow(effect, resolvedParams) {
     mainWindow.webContents.send('effect-active', true);
   }
 
-  // Show effect window AFTER main window is raised, so z-order is correct
   effectWin.loadFile(effect.entryPath);
-  effectWin.webContents.on('did-finish-load', () => {
-    effectWin.showInactive(); // show without stealing focus
-    const payload = {
-      id: effect.id,
-      duration: resolvedParams.duration,
-      params: resolvedParams
-    };
-    effectWin.webContents.send('effect:start', payload);
-    if (effect.startChannel) {
-      effectWin.webContents.send(effect.startChannel, resolvedParams);
-    }
-    // Re-raise main window after effect window shows
-    if (mainWindow && !mainWindow.isDestroyed()) {
-      mainWindow.moveTop();
-    }
-  });
 
   effectWin.on('closed', () => {
     if (activeEffectWindows.get(effect.id) === effectWin) {
@@ -216,6 +197,7 @@ function createEffectWindow(effect, resolvedParams) {
 
         if (activeEffectWindows.size === 0) {
           stopEffectHitTestPolling();
+          stopEffectRaiseTimer();
           // Notify renderer that effects are done — resume normal hit-test
           mainWindow.webContents.send('effect-active', false);
         }
@@ -303,6 +285,28 @@ function stopEffectHitTestPolling() {
   if (effectHitTestTimer) {
     clearInterval(effectHitTestTimer);
     effectHitTestTimer = null;
+  }
+}
+
+// Periodically raise main window above effect windows.
+// On Windows, all TOPMOST windows are at the same z-level, and the most
+// recently shown window wins. We need to keep re-raising the main window
+// so it stays above the effect window for mouse event routing.
+function startEffectRaiseTimer() {
+  if (effectRaiseTimer) return;
+  effectRaiseTimer = setInterval(() => {
+    if (activeEffectWindows.size === 0 || !mainWindow || mainWindow.isDestroyed()) {
+      stopEffectRaiseTimer();
+      return;
+    }
+    mainWindow.moveTop();
+  }, 100);
+}
+
+function stopEffectRaiseTimer() {
+  if (effectRaiseTimer) {
+    clearInterval(effectRaiseTimer);
+    effectRaiseTimer = null;
   }
 }
 
