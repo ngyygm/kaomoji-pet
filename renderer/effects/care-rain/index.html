@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <title> </title>
+  <script src="../_shared/effect-runtime.js"></script>
   <style>
     * { margin: 0; padding: 0; user-select: none; }
     html, body {
@@ -19,6 +20,7 @@
       animation: rainFall var(--fall-duration, 6s) ease-in forwards;
       opacity: 0;
       white-space: nowrap;
+      will-change: transform, opacity;
     }
     @keyframes rainFall {
       0% { opacity: 0; transform: translateY(-40px); }
@@ -32,6 +34,7 @@
   <script>
     const { ipcRenderer } = require('electron');
     function startEffect({ messages, duration, opacity }) {
+      const runtime = EffectRuntime.createRuntime({ id: 'care-rain', adaptiveQuality: true, minQuality: 0.4 });
       const peakOpacity = opacity || 0.85;
       const screenH = window.innerHeight;
       const screenW = window.innerWidth;
@@ -48,7 +51,7 @@
       ];
       const pool = messages && messages.length ? messages : defaultMessages;
 
-      const totalCount = 500;
+      const totalCount = runtime.scaleCount(500, 80);
       let removedCount = 0;
 
       // Create multiple columns across the screen

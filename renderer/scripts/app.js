@@ -10,7 +10,6 @@ class App {
 
     this.logger = new RuntimeLogger('renderer');
     this.movementController = null;
-    this.effectController = null;
     this.actionController = null;
     this.menuController = null;
     this.inputController = null;
@@ -29,19 +28,14 @@ class App {
       logger: this.logger,
       renderer: this.renderer
     });
-    this.effectController = new EffectController({
-      logger: this.logger,
-      renderer: this.renderer
-    });
-    await this.effectController.loadEffects();
 
     this.actionController = new ActionController({
       logger: this.logger,
       renderer: this.renderer,
       hiddenState: this.hiddenState,
-      movementController: this.movementController,
-      effectController: this.effectController
+      movementController: this.movementController
     });
+    await this.actionController.loadEffects();
 
     this.behaviorEngine = new BehaviorEngine(
       this.hiddenState,
@@ -53,7 +47,6 @@ class App {
     this.menuController = new MenuController({
       logger: this.logger,
       actionController: this.actionController,
-      effectController: this.effectController,
       saveManager: this.saveManager,
       renderer: this.renderer,
       petState: this.petState,
@@ -90,8 +83,7 @@ class App {
   getState() {
     return {
       action: this.actionController?.getState?.() || null,
-      movement: this.movementController?.getState?.() || null,
-      effects: this.effectController?.getState?.() || null
+      movement: this.movementController?.getState?.() || null
     };
   }
 

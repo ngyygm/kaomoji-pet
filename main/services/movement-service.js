@@ -1,4 +1,4 @@
-const { screen } = require('electron');
+const { ipcMain } = require('electron');
 
 class MovementService {
   constructor({ windowService, logger }) {
@@ -7,9 +7,12 @@ class MovementService {
     this.moveTimer = null;
   }
 
-  getScreenSize() {
-    const { width, height } = screen.getPrimaryDisplay().workAreaSize;
-    return { width, height };
+  registerIpc() {
+    ipcMain.handle('window:moveTo', (_, payload) => this.moveTo(payload || {}));
+    ipcMain.handle('window:stopMovement', (_, payload) => {
+      this.stop(payload?.reason || 'ipc');
+      return { success: true };
+    });
   }
 
   stop(reason = 'window:stopMovement') {
@@ -42,31 +45,22 @@ class MovementService {
     let index = 0;
 
     this.logger.write('movement:start', 'main', null, {
-      startX,
-      startY,
-      targetX: Math.round(targetX),
-      targetY: Math.round(targetY),
+      startX, startY,
+      targetX: Math.round(targetX), targetY: Math.round(targetY),
       curveType: curveType || 'linear'
     });
 
     this.moveTimer = setInterval(() => {
       const currentWin = this.windowService.getWindow();
-      if (!currentWin) {
-        this.stop('window-gone');
-        return;
-      }
+      if (!currentWin) { this.stop('window-gone'); return; }
 
-      const speed = Math.random() < 0.6 ? 1 : 2;
-      index += speed;
+      index += Math.random() < 0.6 ? 1 : 2;
 
       if (index >= waypoints.length) {
         this.windowService.setPosition(targetX, targetY);
         clearInterval(this.moveTimer);
         this.moveTimer = null;
-        this.logger.write('movement:done', 'main', null, {
-          x: Math.round(targetX),
-          y: Math.round(targetY)
-        });
+        this.logger.write('movement:done', 'main', null, { x: Math.round(targetX), y: Math.round(targetY) });
         this.windowService.send('window:movement-done', { x: Math.round(targetX), y: Math.round(targetY) });
         return;
       }
@@ -87,6 +81,7 @@ class MovementService {
 
     if (dist < 5) return [{ x: tx, y: ty }];
 
+    // Perpendicular vector for curve offsets
     const nx = dx / dist;
     const ny = dy / dist;
     const perpX = -ny;
@@ -112,32 +107,7 @@ class MovementService {
       return points;
     }
 
-    if (type === 'bezier') {
-      const mx = (sx + tx) / 2;
-      const my = (sy + ty) / 2;
-      const offset = (Math.random() > 0.5 ? 1 : -1) * (40 + Math.random() * 80);
-      const cx = mx + perpX * offset;
-      const cy = my + perpY * offset;
-      for (let i = 0; i <= steps; i++) {
-        const t = i / steps;
-        points.push({
-          x: (1 - t) * (1 - t) * sx + 2 * (1 - t) * t * cx + t * t * tx,
-          y: (1 - t) * (1 - t) * sy + 2 * (1 - t) * t * cy + t * t * ty
-        });
-      }
-      return points;
-    }
-
-    if (type === 'arc') {
-      const bulge = (Math.random() > 0.5 ? 1 : -1) * (0.2 + Math.random() * 0.4);
-      for (let i = 0; i <= steps; i++) {
-        const t = i / steps;
-        const offset = Math.sin(t * Math.PI) * dist * bulge;
-        points.push({ x: sx + dx * t + perpX * offset, y: sy + dy * t + perpY * offset });
-      }
-      return points;
-    }
-
+    // Fallback to linear for unknown curve types
     return this.generateCurvePath(sx, sy, tx, ty, 'linear');
   }
 }

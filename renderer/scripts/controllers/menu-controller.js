@@ -1,8 +1,7 @@
 class MenuController {
-  constructor({ logger, actionController, effectController, saveManager, renderer, petState, hiddenState }) {
+  constructor({ logger, actionController, saveManager, renderer, petState, hiddenState }) {
     this.logger = logger;
     this.actionController = actionController;
-    this.effectController = effectController;
     this.saveManager = saveManager;
     this.renderer = renderer;
     this.petState = petState;
@@ -36,6 +35,8 @@ class MenuController {
   close(reason = 'menu-close') {
     this.menuEl.classList.add('hidden');
     this.actionController.onMenuClose(reason);
+    // Return focus to previously active window.
+    window.petAPI.blurWindow();
   }
 
   async onMenuClick(e) {
@@ -94,7 +95,7 @@ class MenuController {
   }
 
   async renderEffects() {
-    const effects = await this.effectController.loadEffects();
+    const effects = await this.actionController.loadEffects();
     const effectItems = effects.map(effect =>
       `<div class="ctx-item" data-ctx="effect-trigger" data-effect-id="${effect.id}">${effect.emoji} ${effect.name}</div>`
     ).join('');

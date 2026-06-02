@@ -280,23 +280,23 @@
             p.y += p.vy;
             p.life -= p.decay;
           }
-          for (let i = particles.length - 1; i >= 0; i--) if (particles[i].life <= 0) particles.splice(i, 1);
+          for (let i = particles.length - 1; i >= 0; i--) if (particles[i].life <= 0) EffectRuntime.removeAt(particles, i);
           for (let f of flashes) {
             f.radius += 3;
             f.alpha -= 0.08;
           }
-          for (let i = flashes.length - 1; i >= 0; i--) if (flashes[i].alpha <= 0) flashes.splice(i, 1);
+          for (let i = flashes.length - 1; i >= 0; i--) if (flashes[i].alpha <= 0) EffectRuntime.removeAt(flashes, i);
           for (let w of shockwaves) {
             w.radius += 8;
             w.alpha -= 0.04;
           }
-          for (let i = shockwaves.length - 1; i >= 0; i--) if (shockwaves[i].alpha <= 0) shockwaves.splice(i, 1);
+          for (let i = shockwaves.length - 1; i >= 0; i--) if (shockwaves[i].alpha <= 0) EffectRuntime.removeAt(shockwaves, i);
           for (let s of victorySparkles) {
             s.x += s.vx;
             s.y += s.vy;
             s.life -= s.decay;
           }
-          for (let i = victorySparkles.length - 1; i >= 0; i--) if (victorySparkles[i].life <= 0) victorySparkles.splice(i, 1);
+          for (let i = victorySparkles.length - 1; i >= 0; i--) if (victorySparkles[i].life <= 0) EffectRuntime.removeAt(victorySparkles, i);
           return;
         }
 
@@ -363,7 +363,7 @@
           b.y -= b.speed;
           if (b.y < -20) b.active = false;
         }
-        for (let i = bullets.length - 1; i >= 0; i--) if (!bullets[i].active) bullets.splice(i, 1);
+        for (let i = bullets.length - 1; i >= 0; i--) if (!bullets[i].active) EffectRuntime.removeAt(bullets, i);
 
         for (let eb of enemyBullets) {
           if (!eb.active) continue;
@@ -377,13 +377,13 @@
             defender.x += (Math.random() - 0.5) * 60;
           }
         }
-        for (let i = enemyBullets.length - 1; i >= 0; i--) if (!enemyBullets[i].active) enemyBullets.splice(i, 1);
+        for (let i = enemyBullets.length - 1; i >= 0; i--) if (!enemyBullets[i].active) EffectRuntime.removeAt(enemyBullets, i);
 
         // Check collisions
         checkCollisions();
 
         // Clean up dead aliens that finished their hit animation
-        for (let i = aliens.length - 1; i >= 0; i--) if (!aliens[i].alive && aliens[i].hitAnim <= 0) aliens.splice(i, 1);
+        for (let i = aliens.length - 1; i >= 0; i--) if (!aliens[i].alive && aliens[i].hitAnim <= 0) EffectRuntime.removeAt(aliens, i);
 
         // Update particles
         for (let p of particles) {
@@ -391,20 +391,20 @@
           p.y += p.vy;
           p.life -= p.decay;
         }
-        for (let i = particles.length - 1; i >= 0; i--) if (particles[i].life <= 0) particles.splice(i, 1);
+        for (let i = particles.length - 1; i >= 0; i--) if (particles[i].life <= 0) EffectRuntime.removeAt(particles, i);
 
         // Update flashes
         for (let f of flashes) {
           f.radius += 3;
           f.alpha -= 0.08;
         }
-        for (let i = flashes.length - 1; i >= 0; i--) if (flashes[i].alpha <= 0) flashes.splice(i, 1);
+        for (let i = flashes.length - 1; i >= 0; i--) if (flashes[i].alpha <= 0) EffectRuntime.removeAt(flashes, i);
 
         for (let w of shockwaves) {
           w.radius += 8;
           w.alpha -= 0.04;
         }
-        for (let i = shockwaves.length - 1; i >= 0; i--) if (shockwaves[i].alpha <= 0) shockwaves.splice(i, 1);
+        for (let i = shockwaves.length - 1; i >= 0; i--) if (shockwaves[i].alpha <= 0) EffectRuntime.removeAt(shockwaves, i);
 
         // Update victory sparkles
         for (let s of victorySparkles) {
@@ -412,7 +412,7 @@
           s.y += s.vy;
           s.life -= s.decay;
         }
-        for (let i = victorySparkles.length - 1; i >= 0; i--) if (victorySparkles[i].life <= 0) victorySparkles.splice(i, 1);
+        for (let i = victorySparkles.length - 1; i >= 0; i--) if (victorySparkles[i].life <= 0) EffectRuntime.removeAt(victorySparkles, i);
       }
 
       function draw(now) {
@@ -451,66 +451,33 @@
           ctx.save();
           ctx.translate(sx + wobble, sy);
           ctx.scale(battleScale, battleScale);
-          ctx.font = ALIEN_FONT;
-          ctx.textAlign = 'center';
-          ctx.textBaseline = 'middle';
-          ctx.fillStyle = a.color;
-          ctx.shadowColor = a.color;
-          ctx.shadowBlur = 8;
-          ctx.fillText(a.text, 0, 0);
+          runtime.drawGlowText(ctx, a.text, 0, 0, ALIEN_FONT, a.color, 1, 8);
           ctx.restore();
         }
 
         // Draw bullets
         for (let b of bullets) {
           if (!b.active) continue;
-          ctx.save();
-          ctx.font = BULLET_FONT;
           ctx.textAlign = 'center';
           ctx.textBaseline = 'middle';
-          ctx.fillStyle = '#f472b6';
-          ctx.shadowColor = '#f472b6';
-          ctx.shadowBlur = 12;
-          ctx.fillText(b.symbol || '♡', b.x, b.y);
-          ctx.restore();
+          runtime.drawGlowText(ctx, b.symbol || '♡', b.x, b.y, BULLET_FONT, '#f472b6', 1, 12);
         }
 
         for (let eb of enemyBullets) {
           if (!eb.active) continue;
-          ctx.save();
-          ctx.font = BULLET_FONT;
           ctx.textAlign = 'center';
           ctx.textBaseline = 'middle';
-          ctx.fillStyle = eb.color;
-          ctx.shadowColor = eb.color;
-          ctx.shadowBlur = 16;
-          ctx.fillText(eb.symbol, eb.x, eb.y);
-          ctx.restore();
+          runtime.drawGlowText(ctx, eb.symbol, eb.x, eb.y, BULLET_FONT, eb.color, 1, 16);
         }
 
         // Draw defender
-        ctx.save();
-        ctx.font = DEFENDER_FONT;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
-        ctx.fillStyle = '#fde68a';
-        ctx.shadowColor = '#fde68a';
-        ctx.shadowBlur = 20;
-        ctx.fillText('(=^・ω・^=)', defender.x, defender.y);
-        ctx.restore();
+        runtime.drawGlowText(ctx, '(=^・ω・^=)', defender.x, defender.y, DEFENDER_FONT, '#fde68a', fadeAlpha, 20);
 
         // Draw particles
         for (let p of particles) {
-          ctx.save();
-          ctx.globalAlpha = p.life * fadeAlpha;
-          ctx.font = `${p.size}px "Segoe UI Emoji", "Apple Color Emoji", sans-serif`;
-          ctx.textAlign = 'center';
-          ctx.textBaseline = 'middle';
-          ctx.fillStyle = p.color;
-          ctx.shadowColor = p.color;
-          ctx.shadowBlur = 6;
-          ctx.fillText(p.symbol, p.x, p.y);
-          ctx.restore();
+          runtime.drawDot(ctx, p.x, p.y, p.size, p.color, p.life * fadeAlpha, 6);
         }
 
         // Draw flashes
@@ -532,43 +499,27 @@
           ctx.strokeStyle = w.color;
           ctx.lineWidth = 3;
           ctx.shadowColor = w.color;
-          ctx.shadowBlur = 16;
+          ctx.shadowBlur = 16 * runtime.state.quality;
           ctx.stroke();
           ctx.restore();
         }
 
         // Victory sparkles
         for (let s of victorySparkles) {
-          ctx.save();
-          ctx.globalAlpha = s.life * fadeAlpha;
-          ctx.font = `${s.size}px "Segoe UI Emoji", "Apple Color Emoji", sans-serif`;
-          ctx.textAlign = 'center';
-          ctx.textBaseline = 'middle';
-          ctx.fillStyle = s.color;
-          ctx.shadowColor = s.color;
-          ctx.shadowBlur = 10;
-          ctx.fillText(s.symbol, s.x, s.y);
-          ctx.restore();
+          const sparkleFont = `${s.size}px "Segoe UI Emoji", "Apple Color Emoji", sans-serif`;
+          runtime.drawGlowText(ctx, s.symbol, s.x, s.y, sparkleFont, s.color, s.life * fadeAlpha, 10);
         }
 
         // Victory text
         if (gameResult === 'victory' && gameOver) {
-          ctx.save();
-          ctx.globalAlpha = fadeAlpha;
-          ctx.font = 'bold 48px "Segoe UI", sans-serif';
-          ctx.textAlign = 'center';
-          ctx.textBaseline = 'middle';
-          ctx.fillStyle = '#fde68a';
-          ctx.shadowColor = '#fde68a';
-          ctx.shadowBlur = 30;
-          ctx.fillText('VICTORY! ★', W / 2, H / 2);
-          ctx.restore();
+          const victoryFont = 'bold 48px "Segoe UI", sans-serif';
+          runtime.drawGlowText(ctx, 'VICTORY! ★', W / 2, H / 2, victoryFont, '#fde68a', fadeAlpha, 30);
         }
 
         ctx.globalAlpha = 1;
       }
 
-      function gameLoop(now) {
+      function gameLoop(now, state, skipRender) {
         update(now);
         draw(now);
         if (fadeAlpha > 0) {

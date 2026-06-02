@@ -154,16 +154,10 @@
       }
 
       function drawDot(x, y, size, color, alpha, blur = 0) {
-        ctx.globalAlpha = alpha;
-        ctx.fillStyle = color;
-        ctx.shadowColor = color;
-        ctx.shadowBlur = blur * runtime.state.quality;
-        ctx.beginPath();
-        ctx.arc(x, y, size, 0, Math.PI * 2);
-        ctx.fill();
+        runtime.drawDot(ctx, x, y, size, color, alpha, blur);
       }
 
-      runtime.requestEffectFrame((now) => {
+      runtime.requestEffectFrame((now, state, skipRender) => {
         const elapsed = now - startedAt;
         const phase = getPhase(elapsed);
 
@@ -183,7 +177,7 @@
           const f = flashes[i];
           f.life++;
           drawDot(W() / 2, H() / 2, Math.max(W(), H()), f.color, f.alpha * (1 - f.life / f.maxLife), 0);
-          if (f.life >= f.maxLife) flashes.splice(i, 1);
+          if (f.life >= f.maxLife) EffectRuntime.removeAt(flashes, i);
         }
 
         for (let i = shells.length - 1; i >= 0; i--) {
@@ -197,7 +191,7 @@
           if (s.trailTimer % 2 === 0 && runtime.chance(0.9)) ghosts.push({ x: s.x, y: s.y + 2, size: 2, color: s.color, life: 0, maxLife: 24 });
           if (p >= 1) {
             burstShell(s);
-            shells.splice(i, 1);
+            shells.splice(i, 1); // keep splice for shells — order matters for burst timing
           }
         }
 
@@ -207,7 +201,7 @@
           drawDot(ss.x, ss.y, 4, ss.color, 0.9, 9);
           if (now >= ss.burstTime) {
             miniBurst(ss.x, ss.y, ss.hue);
-            subShells.splice(i, 1);
+            EffectRuntime.removeAt(subShells, i);
           }
         }
 
@@ -224,18 +218,15 @@
           if (p.life % Math.round(p.trailInterval / Math.max(0.6, runtime.state.quality)) === 0 && alpha > 0.3 && runtime.chance(0.8)) {
             ghosts.push({ x: p.x, y: p.y, size: Math.max(1, p.size * 0.6), color: p.color, life: 0, maxLife: 22 });
           }
-          if (p.life >= p.maxLife) particles.splice(i, 1);
+          if (p.life >= p.maxLife) EffectRuntime.removeAt(particles, i);
         }
 
         for (let i = ghosts.length - 1; i >= 0; i--) {
           const g = ghosts[i];
           g.life++;
           drawDot(g.x, g.y, g.size, g.color, 0.45 * (1 - g.life / g.maxLife), 4);
-          if (g.life >= g.maxLife) ghosts.splice(i, 1);
+          if (g.life >= g.maxLife) EffectRuntime.removeAt(ghosts, i);
         }
-
-        ctx.shadowBlur = 0;
-        ctx.globalAlpha = 1;
 
         if (elapsed >= duration && shells.length === 0 && particles.length === 0 && subShells.length === 0) {
           runtime.stop();

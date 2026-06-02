@@ -137,5 +137,8 @@ class InputController {
     this.dragStart = null;
     this.dragWindow = null;
     this.isDragging = false;
+
+    // Return focus to previously active window.
+    window.petAPI.blurWindow();
   }
 }

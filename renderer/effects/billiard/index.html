@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <title> </title>
+  <script src="../_shared/effect-runtime.js"></script>
   <style>
     * { margin: 0; padding: 0; user-select: none; }
     html, body {
@@ -249,6 +250,7 @@
 
     // === Billiard bouncing mode ===
     function startBilliard(km, duration) {
+      const runtime = EffectRuntime.createRuntime({ id: 'billiard', adaptiveQuality: true, minQuality: 0.5 });
       const el = document.getElementById('giant');
       el.style.display = 'none';
 
@@ -349,9 +351,7 @@
         }
 
         // Apply transform
-        ball.style.left = x + 'px';
-        ball.style.top = y + 'px';
-        ball.style.transform = `translate(-50%, -50%) rotate(${rotation}deg)`;
+        ball.style.transform = `translate(${x}px, ${y}px) translate(-50%, -50%) rotate(${rotation}deg)`;
         ball.style.color = color;
         ball.style.textShadow = `0 0 50px ${color}, 0 0 100px ${color}`;
 
@@ -381,9 +381,7 @@
         const trail = document.createElement('div');
         trail.className = 'billiard-trail';
         trail.innerHTML = '(<span style="display:inline-block;transform:rotate(0deg)">@</span>ω<span style="display:inline-block;transform:rotate(0deg)">@</span>)';
-        trail.style.left = point.x + 'px';
-        trail.style.top = point.y + 'px';
-        trail.style.transform = `translate(-50%, -50%) rotate(${point.rotation}deg) scale(${0.72 + idx * 0.08})`;
+        trail.style.transform = `translate(${point.x}px, ${point.y}px) translate(-50%, -50%) rotate(${point.rotation}deg) scale(${0.72 + idx * 0.08})`;
         trail.style.color = color;
         trail.style.opacity = (0.12 + idx * 0.08).toString();
         trail.style.fontSize = (104 + idx * 8) + 'px';
@@ -400,11 +398,16 @@
         spark.className = 'billiard-spark';
         const angle = Math.random() * Math.PI * 2;
         const dist = 30 + Math.random() * 60;
-        spark.style.left = (x + Math.cos(angle) * dist) + 'px';
-        spark.style.top = (y + Math.sin(angle) * dist) + 'px';
+        const sx = x + Math.cos(angle) * dist;
+        const sy = y + Math.sin(angle) * dist;
+        spark.style.transform = `translate(${sx}px, ${sy}px)`;
         spark.style.background = color;
         spark.style.boxShadow = `0 0 6px ${color}`;
         document.body.appendChild(spark);
+        spark.animate([
+          { opacity: 1, transform: `translate(${sx}px, ${sy}px) scale(1)` },
+          { opacity: 0, transform: `translate(${sx}px, ${sy}px) scale(0)` }
+        ], { duration: 500, easing: 'ease-out', fill: 'forwards' });
         setTimeout(() => spark.remove(), 500);
       }
     }

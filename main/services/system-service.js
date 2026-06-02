@@ -1,6 +1,5 @@
-const { powerMonitor, screen } = require('electron');
+const { powerMonitor, ipcMain, screen } = require('electron');
 const os = require('os');
-const { execSync } = require('child_process');
 
 class SystemService {
   constructor({ windowService, logger }) {
@@ -20,6 +19,10 @@ class SystemService {
     };
   }
 
+  registerIpc() {
+    ipcMain.handle('system:getSnapshot', () => ({ ...this.snapshot }));
+  }
+
   start() {
     this.startMouseSampling();
     this.startMetricsSampling();
@@ -27,18 +30,8 @@ class SystemService {
   }
 
   stop() {
-    if (this.mouseTimer) {
-      clearInterval(this.mouseTimer);
-      this.mouseTimer = null;
-    }
-    if (this.metricsTimer) {
-      clearInterval(this.metricsTimer);
-      this.metricsTimer = null;
-    }
-  }
-
-  getSnapshot() {
-    return { ...this.snapshot };
+    if (this.mouseTimer) { clearInterval(this.mouseTimer); this.mouseTimer = null; }
+    if (this.metricsTimer) { clearInterval(this.metricsTimer); this.metricsTimer = null; }
   }
 
   startMouseSampling() {
@@ -48,21 +41,17 @@ class SystemService {
 
       const point = screen.getCursorScreenPoint();
       const bounds = win.getBounds();
-      const speed = Math.sqrt(
-        Math.pow(point.x - this.lastMouse.x, 2) + Math.pow(point.y - this.lastMouse.y, 2)
-      );
 
-      const payload = {
-        screenX: point.x,
-        screenY: point.y,
+      // Only send relX/relY — the only fields the renderer consumes
+      this.windowService.send('system:global-mouse', {
         relX: point.x - bounds.x,
         relY: point.y - bounds.y,
         winCenterX: bounds.width / 2,
         winCenterY: bounds.height / 2,
-        speed
-      };
-
-      this.windowService.send('system:global-mouse', payload);
+        speed: Math.sqrt(
+          Math.pow(point.x - this.lastMouse.x, 2) + Math.pow(point.y - this.lastMouse.y, 2)
+        )
+      });
       this.lastMouse = point;
     }, 200);
   }
@@ -70,7 +59,7 @@ class SystemService {
   startMetricsSampling() {
     let previousCpu = this.getCpuUsage();
 
-    this.metricsTimer = setInterval(() => {
+    this.metricsTimer = setInterval(async () => {
       const currentCpu = this.getCpuUsage();
       const idleDiff = currentCpu.idle - previousCpu.idle;
       const totalDiff = currentCpu.total - previousCpu.total;
@@ -87,7 +76,7 @@ class SystemService {
       this.snapshot = {
         cpu,
         memoryPercent,
-        batteryLevel: this.getBatteryLevel(),
+        batteryLevel: await this.getBatteryLevel(),
         isCharging: this.isCharging,
         idleSeconds: this.getIdleSeconds()
       };
@@ -106,32 +95,23 @@ class SystemService {
     return { idle: totalIdle, total: totalTick };
   }
 
-  getBatteryLevel() {
+  async getBatteryLevel() {
     try {
-      const output = execSync('wmic path win32_battery get EstimatedChargeRemaining', { timeout: 3000 }).toString();
-      const match = output.match(/\d+/);
-      if (match) return parseInt(match[0], 10);
-    } catch (_) {
-      // Desktop machines often have no battery.
-    }
+      const state = await powerMonitor.getSystemBatteryState();
+      if (typeof state.percent === 'number') return state.percent;
+    } catch (_) {}
     return 100;
   }
 
   getIdleSeconds() {
-    try {
-      return powerMonitor.getSystemIdleTime();
-    } catch (_) {
-      return 0;
-    }
+    try { return powerMonitor.getSystemIdleTime(); } catch (_) { return 0; }
   }
 
   bindPowerEvents() {
     try {
       powerMonitor.on('on-battery', () => { this.isCharging = false; });
       powerMonitor.on('on-ac', () => { this.isCharging = true; });
-    } catch (_) {
-      // powerMonitor events may be unavailable during early startup.
-    }
+    } catch (_) {}
   }
 }
 

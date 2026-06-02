@@ -11,10 +11,10 @@ contextBridge.exposeInMainWorld('petAPI', {
   getWindowSize: () => ipcRenderer.invoke('window:getSize'),
   setWindowPosition: (x, y) => ipcRenderer.invoke('window:setPosition', { x, y }),
   resizeWindow: (width, height) => ipcRenderer.invoke('window:setSize', { width, height }),
+  blurWindow: () => ipcRenderer.invoke('window:blur'),
   moveWindowTo: (targetX, targetY, curveType) => ipcRenderer.invoke('window:moveTo', { targetX, targetY, curveType }),
   stopMovement: (reason) => ipcRenderer.invoke('window:stopMovement', { reason }),
 
-  getSystemSnapshot: () => ipcRenderer.invoke('system:getSnapshot'),
   onSystemMetrics: (callback) => on('system:metrics', callback),
   onGlobalMouse: (callback) => on('system:global-mouse', callback),
   onMovementDone: (callback) => on('window:movement-done', callback),
@@ -36,15 +36,5 @@ contextBridge.exposeInMainWorld('petAPI', {
   closeApp: () => ipcRenderer.send('app:close'),
   onAppClosing: (callback) => on('app:closing', callback),
   showRenameDialog: (currentName) => ipcRenderer.invoke('dialog:rename', currentName),
-  getGpuStatus: () => ipcRenderer.invoke('gpu:status'),
-
-  // Compatibility aliases while renderer modules are being migrated.
-  stopWalk: () => ipcRenderer.invoke('window:stopMovement', { reason: 'legacy-stopWalk' }),
-  onWalkDone: (callback) => on('window:movement-done', callback),
-  moveWindow: (deltaX, deltaY) => {
-    ipcRenderer.invoke('window:getPosition').then((pos) => {
-      if (!pos) return;
-      ipcRenderer.invoke('window:setPosition', { x: pos.x + deltaX, y: pos.y + deltaY });
-    });
-  }
+  getGpuStatus: () => ipcRenderer.invoke('gpu:status')
 });

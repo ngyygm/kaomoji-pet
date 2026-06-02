@@ -1,22 +1,33 @@
-const { BrowserWindow, screen } = require('electron');
+const { BrowserWindow, ipcMain, screen } = require('electron');
 const path = require('path');
-
-function toWindowCoord(value) {
-  const n = Number(value);
-  return Number.isFinite(n) ? Math.round(n) : null;
-}
-
-function configureChromelessWindow(win) {
-  if (typeof win.setAutoHideMenuBar === 'function') win.setAutoHideMenuBar(true);
-  win.setMenuBarVisibility(false);
-  if (typeof win.setMenu === 'function') win.setMenu(null);
-}
 
 class WindowService {
   constructor({ logger }) {
     this.logger = logger;
     this.mainWindow = null;
-    this._heartbeatTimer = null;
+  }
+
+  registerIpc() {
+    ipcMain.handle('window:getState', () => this.getState());
+    ipcMain.handle('window:getPosition', () => {
+      const win = this.getWindow();
+      if (!win) return null;
+      const [x, y] = win.getPosition();
+      return { x, y };
+    });
+    ipcMain.handle('window:getSize', () => {
+      const win = this.getWindow();
+      if (!win) return null;
+      const [width, height] = win.getSize();
+      return { width, height };
+    });
+    ipcMain.handle('window:setPosition', (_, payload) => this.setPosition(payload?.x, payload?.y));
+    ipcMain.handle('window:setSize', (_, payload) => this.setSize(payload?.width, payload?.height));
+    ipcMain.handle('window:blur', () => this.blurWindow());
+    ipcMain.handle('window:getScreenSize', () => {
+      const { width, height } = screen.getPrimaryDisplay().workAreaSize;
+      return { width, height };
+    });
   }
 
   createMainWindow() {
@@ -38,7 +49,7 @@ class WindowService {
       hasShadow: false,
       backgroundColor: '#00000000',
       titleBarOverlay: false,
-      focusable: false,
+      focusable: true,
       show: false,
       webPreferences: {
         preload: path.join(__dirname, '..', '..', 'preload.js'),
@@ -48,22 +59,23 @@ class WindowService {
       }
     });
 
-    configureChromelessWindow(this.mainWindow);
-    // Always capture mouse events — left-click must never break.
-    // Trade-off: transparent areas also capture, but the window is small (350×260).
+    this.mainWindow.removeMenu();
     this.mainWindow.setIgnoreMouseEvents(false);
+
+    // Windows: 彻底移除标题栏残留边框
+    if (process.platform === 'win32') {
+      this.mainWindow.hookWindowMessage(0x0083, () => {});
+    }
     this.mainWindow.loadFile(path.join(__dirname, '..', '..', 'renderer', 'index.html'));
     this.mainWindow.setVisibleOnAllWorkspaces(true);
 
     this.mainWindow.once('ready-to-show', () => {
       if (!this.mainWindow || this.mainWindow.isDestroyed()) return;
-      this.mainWindow.show();
-      this.startHeartbeat();
+      this.mainWindow.showInactive();
       this.logger.write('app-ready', 'main', this.getState());
     });
 
     this.mainWindow.on('closed', () => {
-      this.stopHeartbeat();
       this.logger.write('window-closed', 'main');
       this.mainWindow = null;
     });
@@ -79,13 +91,7 @@ class WindowService {
   getState() {
     const win = this.getWindow();
     if (!win) return { exists: false };
-    const bounds = win.getBounds();
-    return {
-      exists: true,
-      bounds,
-      alwaysOnTop: true,
-      mouseCapture: true
-    };
+    return { exists: true, bounds: win.getBounds() };
   }
 
   send(channel, payload) {
@@ -96,73 +102,31 @@ class WindowService {
 
   setPosition(x, y) {
     const win = this.getWindow();
-    const safeX = toWindowCoord(x);
-    const safeY = toWindowCoord(y);
-    if (!win || safeX === null || safeY === null) return false;
-
+    if (!win) return false;
     try {
-      win.setIgnoreMouseEvents(false);
-      win.setPosition(safeX, safeY);
+      win.setPosition(Math.round(x), Math.round(y));
       return true;
     } catch (err) {
-      this.logger.write('ipc-error', 'main', null, {
-        ipc: 'window:setPosition',
-        message: err.message,
-        x: safeX,
-        y: safeY
-      });
+      this.logger.write('ipc-error', 'main', null, { ipc: 'window:setPosition', message: err.message });
       return false;
     }
   }
 
   setSize(width, height) {
     const win = this.getWindow();
-    const safeWidth = toWindowCoord(width);
-    const safeHeight = toWindowCoord(height);
-    if (!win || safeWidth === null || safeHeight === null) return false;
-
+    if (!win) return false;
     try {
-      win.setSize(Math.max(1, safeWidth), Math.max(1, safeHeight));
+      win.setSize(Math.max(1, Math.round(width)), Math.max(1, Math.round(height)));
       return true;
     } catch (err) {
-      this.logger.write('ipc-error', 'main', null, {
-        ipc: 'window:setSize',
-        message: err.message,
-        width: safeWidth,
-        height: safeHeight
-      });
+      this.logger.write('ipc-error', 'main', null, { ipc: 'window:setSize', message: err.message });
       return false;
     }
   }
 
-  /**
-   * Periodically re-assert critical window properties.
-   * Windows 10 DWM can stop delivering WM_LBUTTONDOWN to
-   * WS_EX_LAYERED (transparent) alwaysOnTop windows after
-   * minutes of idle — while WM_MOUSEMOVE and WM_RBUTTONDOWN
-   * continue to work.  Toggling the flag forces DWM to
-   * refresh its internal hit-test cache; a simple re-set
-   * of the same value does NOT.
-   */
-  startHeartbeat() {
-    this.stopHeartbeat();
-    this._heartbeatTimer = setInterval(() => {
-      const win = this.getWindow();
-      if (!win) return;
-      // Toggle: true then false forces a state transition
-      // that DWM actually processes. Setting the same value
-      // is a no-op at the OS level.
-      win.setIgnoreMouseEvents(true);
-      win.setIgnoreMouseEvents(false);
-      win.setAlwaysOnTop(true);
-    }, 10_000);
-  }
-
-  stopHeartbeat() {
-    if (this._heartbeatTimer) {
-      clearInterval(this._heartbeatTimer);
-      this._heartbeatTimer = null;
-    }
+  blurWindow() {
+    const win = this.getWindow();
+    if (win) win.blur();
   }
 
   closeApp(app) {
@@ -173,4 +137,4 @@ class WindowService {
   }
 }
 
-module.exports = { WindowService, configureChromelessWindow };
+module.exports = { WindowService };

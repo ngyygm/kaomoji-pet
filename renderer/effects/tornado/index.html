@@ -89,18 +89,13 @@
       }
 
       function drawText(p, opacity, scale = 1, shadow = 18) {
+        const font = `${p.size}px "Segoe UI Emoji", "Apple Color Emoji", "Microsoft YaHei", sans-serif`;
         ctx.save();
         ctx.globalAlpha = opacity;
         ctx.translate(p.x, p.y);
         ctx.rotate(p.rotation || 0);
         ctx.scale(scale, scale);
-        ctx.font = `${p.size}px "Segoe UI Emoji", "Apple Color Emoji", "Microsoft YaHei", sans-serif`;
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillStyle = p.color;
-        ctx.shadowColor = p.color;
-        ctx.shadowBlur = shadow * runtime.state.quality;
-        ctx.fillText(p.text, 0, 0);
+        runtime.drawGlowText(ctx, p.text, 0, 0, font, p.color, opacity, shadow * runtime.state.quality);
         ctx.restore();
       }
 
@@ -108,7 +103,7 @@
         ghosts.push({ text: p.text, x: p.x, y: p.y, size: p.size, color: p.color, rotation: p.rotation, born: performance.now() });
       }
 
-      runtime.requestEffectFrame((now, state) => {
+      runtime.requestEffectFrame((now, state, skipRender) => {
         const elapsed = now - startTime;
         const progress = Math.min(elapsed / DURATION, 1);
         ctx.clearRect(0, 0, W(), H());
@@ -215,7 +210,7 @@
               p.ghostTimer = 0;
               spawnGhost(p);
             }
-            if (p.x < -80 || p.x > W() + 80 || p.y < -80 || p.y > H() + 80) explosion.splice(i, 1);
+            if (p.x < -80 || p.x > W() + 80 || p.y < -80 || p.y > H() + 80) EffectRuntime.removeAt(explosion, i);
           }
         }
 
@@ -223,14 +218,11 @@
           const g = ghosts[i];
           const age = now - g.born;
           if (age > 400) {
-            ghosts.splice(i, 1);
+            EffectRuntime.removeAt(ghosts, i);
           } else {
             drawText(g, 0.3 * (1 - age / 400), 1, 8);
           }
         }
-
-        ctx.globalAlpha = 1;
-        ctx.shadowBlur = 0;
 
         if (progress >= 1) {
           runtime.stop();

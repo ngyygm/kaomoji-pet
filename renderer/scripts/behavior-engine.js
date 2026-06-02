@@ -54,19 +54,17 @@ class BehaviorEngine {
 
   async _getAvailableBigEffects() {
     let effects = [];
-    if (this.actionController?.effectController) {
+    if (this.actionController) {
       try {
-        effects = await this.actionController.effectController.loadEffects();
+        effects = await this.actionController.loadEffects();
       } catch (err) {
         console.warn('[big-fx] failed to refresh effect list', err);
       }
     }
 
-    if (effects.length) {
-      window.BIG_EFFECTS = effects;
-      if (typeof BIG_EFFECTS !== 'undefined') BIG_EFFECTS = effects;
-    }
-    const available = effects.filter(effect => effect && effect.id);
+    const available = effects.length
+      ? effects.filter(effect => effect && effect.id)
+      : [];
     window.petAPI.logInteraction?.('big-effect-list', {
       source: 'renderer',
       state: this.actionController?.getState?.() || null,

@@ -40,7 +40,7 @@
         });
       }
 
-      function loop(now) {
+      function loop(now, state, skipRender) {
         const dt = Math.min(32, now - last); last = now;
         const elapsed = now - startTime;
         ctx.clearRect(0, 0, W, H);
@@ -68,23 +68,20 @@
           }
           ctx.globalAlpha = Math.max(0, m.life);
           ctx.font = `${m.size}px "Segoe UI Emoji", "Microsoft YaHei", sans-serif`;
-          ctx.fillStyle = m.color; ctx.shadowColor = m.color; ctx.shadowBlur = 18;
-          ctx.fillText(m.text, m.x, m.y);
+          runtime.drawGlowText(ctx, m.text, m.x, m.y, ctx.font, m.color, Math.max(0, m.life), 18);
           if (runtime.chance(0.12)) sparkles.push({ x: m.x, y: m.y, vx: (Math.random() - 0.5) * 2, vy: -Math.random() * 2, life: 1, color: m.color });
         }
-        for (let i = meteors.length - 1; i >= 0; i--) if (!(meteors[i].life > 0 && meteors[i].x < W + 260 && meteors[i].y < H + 100)) meteors.splice(i, 1);
-        ctx.shadowBlur = 0;
+        for (let i = meteors.length - 1; i >= 0; i--) if (!(meteors[i].life > 0 && meteors[i].x < W + 260 && meteors[i].y < H + 100)) EffectRuntime.removeAt(meteors, i);
 
         for (const p of sparkles) {
           p.x += p.vx; p.y += p.vy; p.life -= 0.025;
           ctx.globalAlpha = p.life; ctx.fillStyle = p.color; ctx.fillText('✦', p.x, p.y);
         }
-        for (let i = sparkles.length - 1; i >= 0; i--) if (sparkles[i].life <= 0) sparkles.splice(i, 1);
+        for (let i = sparkles.length - 1; i >= 0; i--) if (sparkles[i].life <= 0) EffectRuntime.removeAt(sparkles, i);
 
         ctx.globalAlpha = Math.max(0, Math.min(1, (duration - elapsed) / 900));
         ctx.font = '34px "Segoe UI Emoji", sans-serif';
-        ctx.fillStyle = '#fde68a'; ctx.shadowColor = '#fde68a'; ctx.shadowBlur = 24;
-        ctx.fillText('(=^・ω・^=)', W / 2 - 85, H - 78 + Math.sin(now * 0.004) * 6);
+        runtime.drawGlowText(ctx, '(=^・ω・^=)', W / 2 - 85, H - 78 + Math.sin(now * 0.004) * 6, ctx.font, '#fde68a', ctx.globalAlpha, 24);
 
         if (elapsed >= duration) { runtime.stop(); window.close(); }
       }

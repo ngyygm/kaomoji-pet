@@ -9,19 +9,15 @@ class PetDataRegistry {
     this._moodExpressions = typeof MOOD_EXPRESSIONS !== 'undefined' ? MOOD_EXPRESSIONS : {};
     this._animations = typeof ANIMATIONS !== 'undefined' ? ANIMATIONS : {};
     this._idleSequence = typeof IDLE_SEQUENCE !== 'undefined' ? IDLE_SEQUENCE : [];
-    this._cssClasses = typeof CSS_ANIMATION_CLASSES !== 'undefined' ? CSS_ANIMATION_CLASSES : {};
     this._templates = typeof KAOMOJI_TEMPLATES !== 'undefined' ? KAOMOJI_TEMPLATES : {};
     this._sprites = typeof EVOLUTION_SPRITES !== 'undefined' ? EVOLUTION_SPRITES : {};
     this._particles = typeof PARTICLES !== 'undefined' ? PARTICLES : {};
     this._speech = typeof SPEECH_BUBBLES !== 'undefined' ? SPEECH_BUBBLES : {};
     this._phrases = typeof KAOMOJI_PHRASES !== 'undefined' ? KAOMOJI_PHRASES : [];
     this._colors = typeof MOOD_COLORS !== 'undefined' ? MOOD_COLORS : {};
-    this._timeEvents = typeof TIME_EVENTS !== 'undefined' ? TIME_EVENTS : [];
-    this._randomEvents = typeof RANDOM_EVENTS !== 'undefined' ? RANDOM_EVENTS : [];
     this._emojiReactions = typeof EMOJI_REACTIONS !== 'undefined' ? EMOJI_REACTIONS : {};
     this._mouseReactions = typeof MOUSE_REACTIONS !== 'undefined' ? MOUSE_REACTIONS : {};
     this._activities = typeof ACTIVITIES !== 'undefined' ? ACTIVITIES : {};
-    this._stageSegments = typeof STAGE_SEGMENTS !== 'undefined' ? STAGE_SEGMENTS : {};
     this._segmentGroups = typeof SEGMENT_GROUPS !== 'undefined' ? SEGMENT_GROUPS : {};
     this._kaomojiByMood = typeof KAOMOJI_BY_MOOD !== 'undefined' ? KAOMOJI_BY_MOOD : {};
     this._kaomojiPhrasesZh = typeof KAOMOJI_PHRASES_ZH !== 'undefined' ? KAOMOJI_PHRASES_ZH : {};
@@ -49,10 +45,6 @@ class PetDataRegistry {
 
   getIdleSequence() {
     return this._idleSequence;
-  }
-
-  getCssClass(name) {
-    return this._cssClasses[name] || null;
   }
 
   // --- Templates & Sprites ---
@@ -120,17 +112,6 @@ class PetDataRegistry {
 
   getMoodColor(mood) {
     return this._colors[mood] || this._colors.normal;
-  }
-
-  // --- Events ---
-
-  getTimeEvent(hour) {
-    return this._timeEvents.find(e => e.hour === hour) || null;
-  }
-
-  getRandomEvent() {
-    const idx = Math.floor(Math.random() * this._randomEvents.length);
-    return this._randomEvents[idx];
   }
 
   // --- Reactions ---

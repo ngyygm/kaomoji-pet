@@ -7,6 +7,12 @@ class SaveService {
     this.logger = logger;
   }
 
+  registerIpc() {
+    const { ipcMain } = require('electron');
+    ipcMain.handle('save:load', () => this.load());
+    ipcMain.handle('save:write', (_, data) => this.write(data));
+  }
+
   getSavePath() {
     return path.join(this.app.getPath('userData'), 'save.json');
   }

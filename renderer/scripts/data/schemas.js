@@ -25,32 +25,6 @@ const SEGMENT_ANIM_COMPAT = {
   sparkle: ['deco']
 };
 
-/**
- * 各进化阶段拥有的部位组
- * 特效作用于不存在的部位时自动跳过
- */
-const STAGE_SEGMENTS = {
-  baby:   ['arm', 'eye', 'mouth'],
-  kid:    ['arm', 'ear', 'mouth'],
-  adult:  ['arm', 'ear', 'eye', 'mouth'],
-  legend: ['arm', 'ear', 'eye', 'mouth', 'deco']
-};
-
-/** 验证单个特效的 CSS 兼容性 */
-function validateEffect(effectName, effectDef) {
-  const warnings = [];
-  if (!effectDef.css) return warnings;
-  for (const [segClass, cssAnim] of Object.entries(effectDef.css)) {
-    const group = Object.entries(SEGMENT_GROUPS).find(([_, cls]) => cls.includes(segClass))?.[0];
-    if (!group) { warnings.push(`Effect "${effectName}": unknown segment "${segClass}"`); continue; }
-    const allowed = SEGMENT_ANIM_COMPAT[cssAnim];
-    if (allowed && !allowed.includes(group)) {
-      warnings.push(`Effect "${effectName}": "${cssAnim}" not valid for ${group}`);
-    }
-  }
-  return warnings;
-}
-
 /** 获取部位 class 对应的部位组名 */
 function getSegmentGroup(segClass) {
   for (const [group, classes] of Object.entries(SEGMENT_GROUPS)) {

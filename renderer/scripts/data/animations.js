@@ -56,15 +56,3 @@ const IDLE_SEQUENCE = [
   { type: 'satisfied', duration: 3000 },
   { type: 'pause', duration: 7000 }
 ];
-
-const CSS_ANIMATION_CLASSES = {
-  bounce:    { description: '垂直弹跳', keyframe: 'bounce' },
-  wiggle:    { description: '左右摇摆旋转', keyframe: 'wiggle' },
-  breathe:   { description: '缓慢缩放呼吸（无限循环）', keyframe: 'breathe' },
-  tiltLeft:  { description: '向左歪头', keyframe: 'tiltLeft' },
-  tiltRight: { description: '向右歪头', keyframe: 'tiltRight' },
-  squish:    { description: '挤压变形', keyframe: 'squish' },
-  shiver:    { description: '快速水平颤抖（3次）', keyframe: 'shiver' },
-  stretch:   { description: '拉伸伸展', keyframe: 'stretch' },
-  spin:      { description: '360度旋转', keyframe: 'spin' }
-};

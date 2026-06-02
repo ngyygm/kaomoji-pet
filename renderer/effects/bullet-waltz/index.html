@@ -196,14 +196,10 @@
       const updaters = { SPIRAL: updateSpiral, HEART: updateHeart, PETALS: updatePetals, FAN: updateFan, COMET: updateComet, LATTICE: updateLattice };
 
       function drawGlyph(item, opacity) {
-        ctx.globalAlpha = opacity;
-        ctx.font = `${item.size}px "Segoe UI Emoji", "Apple Color Emoji", "Microsoft YaHei", sans-serif`;
+        const font = `${item.size}px "Segoe UI Emoji", "Apple Color Emoji", "Microsoft YaHei", sans-serif`;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
-        ctx.fillStyle = item.color;
-        ctx.shadowColor = item.color;
-        ctx.shadowBlur = 12 * runtime.state.quality;
-        ctx.fillText(item.symbol, item.x, item.y);
+        runtime.drawGlowText(ctx, item.symbol, item.x, item.y, font, item.color, opacity, 12 * runtime.state.quality);
       }
 
       function fadeAndClose() {
@@ -216,7 +212,7 @@
       }
 
       updateCenterCharacter(true);
-      runtime.requestEffectFrame((now) => {
+      runtime.requestEffectFrame((now, state, skipRender) => {
         if (closing) return;
         frame++;
         const elapsed = now - startedAt;
@@ -246,16 +242,15 @@
           }
           drawGlyph(b, 0.8 * (1 - b.life / b.maxLife));
           if (b.x < -80 || b.x > screenW() + 80 || b.y < -80 || b.y > screenH() + 80 || b.life >= b.maxLife) {
-            bullets.splice(i, 1);
+            EffectRuntime.removeAt(bullets, i);
           }
         }
         for (let i = ghosts.length - 1; i >= 0; i--) {
           const g = ghosts[i];
           g.life++;
           drawGlyph(g, 0.45 * (1 - g.life / g.maxLife));
-          if (g.life >= g.maxLife) ghosts.splice(i, 1);
+          if (g.life >= g.maxLife) EffectRuntime.removeAt(ghosts, i);
         }
-        ctx.shadowBlur = 0;
         ctx.globalAlpha = 1;
       });
     });

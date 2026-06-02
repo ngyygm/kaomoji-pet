@@ -16,7 +16,7 @@ function start(duration) {
     return { x: W*(0.08+Math.random()*0.84), y: H*(0.12+Math.random()*0.7), tx: W*(0.1+band*0.8), ty: H*(0.18+Math.random()*0.62), text: pick(faces), color: pick(colors), phase: Math.random()*6 };
   });
   let startTime = performance.now();
-  function loop(now) {
+  function loop(now, state, skipRender) {
     const elapsed = now - startTime, progress = Math.min(1, elapsed / (duration * 0.72)), fade = Math.max(0, Math.min(1, (duration-elapsed)/800));
     ctx.clearRect(0,0,W,H); ctx.globalAlpha = fade;
     for (const p of points) {
@@ -25,16 +25,17 @@ function start(duration) {
     ctx.lineWidth = 2;
     for (let i=0;i<points.length-1;i++) {
       const p = points[i], q = points[i+1], reveal = Math.min(1, Math.max(0, progress*points.length - i));
-      ctx.globalAlpha = reveal * 0.65 * fade; ctx.strokeStyle = p.color; ctx.shadowColor = p.color; ctx.shadowBlur = 10;
+      ctx.globalAlpha = reveal * 0.65 * fade; ctx.strokeStyle = p.color; ctx.shadowColor = p.color; ctx.shadowBlur = 10 * runtime.state.quality;
       ctx.beginPath(); ctx.moveTo(p.x,p.y); ctx.lineTo(p.x+(q.x-p.x)*reveal,p.y+(q.y-p.y)*reveal); ctx.stroke();
       if (i % 4 === 0 && i + 4 < points.length) { ctx.globalAlpha = reveal*0.25*fade; ctx.beginPath(); ctx.moveTo(p.x,p.y); ctx.lineTo(points[i+4].x,points[i+4].y); ctx.stroke(); }
     }
     for (const p of points) {
       const pulse = 1 + Math.sin(now*0.004+p.phase)*0.18;
-      ctx.globalAlpha = fade; ctx.font = `${18 + 14*pulse}px "Segoe UI Emoji", sans-serif`; ctx.fillStyle=p.color; ctx.shadowColor=p.color; ctx.shadowBlur=18;
-      ctx.fillText(p.text, p.x-28, p.y+8);
+      ctx.font = `${18 + 14*pulse}px "Segoe UI Emoji", sans-serif`;
+      runtime.drawGlowText(ctx, p.text, p.x-28, p.y+8, ctx.font, p.color, fade, 18);
     }
-    ctx.globalAlpha = fade * Math.min(1, progress*2); ctx.font='34px "Microsoft YaHei", sans-serif'; ctx.fillStyle='#fff'; ctx.shadowBlur=20; ctx.fillText('今日星图已生成', W/2-125, H*0.88);
+    ctx.font='34px "Microsoft YaHei", sans-serif';
+    runtime.drawGlowText(ctx, '今日星图已生成', W/2-125, H*0.88, ctx.font, '#fff', fade * Math.min(1, progress*2), 20);
     if (elapsed >= duration) { runtime.stop(); window.close(); }
   }
   runtime.requestEffectFrame(loop);

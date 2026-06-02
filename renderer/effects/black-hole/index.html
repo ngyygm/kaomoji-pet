@@ -27,7 +27,7 @@
         let y = anywhere ? Math.random() * H : (edge === 2 ? -60 : edge === 3 ? H + 60 : Math.random() * H);
         return { x, y, a: Math.random() * Math.PI * 2, r: Math.hypot(x - cx, y - cy), text: Math.random() < 0.28 ? pick(faces) : pick(['✦','★','✧','♡','◇']), color: pick(colors), size: 14 + Math.random() * 22, life: 1 };
       }
-      function loop(now) {
+      function loop(now, state, skipRender) {
         const elapsed = now - startTime, fade = Math.max(0, Math.min(1, (duration - elapsed) / 800));
         ctx.clearRect(0,0,W,H);
         const pulse = 1 + Math.sin(now * 0.004) * 0.12;
@@ -46,13 +46,12 @@
           p.x += dx / d * pull + Math.cos(p.a) * 2.2;
           p.y += dy / d * pull + Math.sin(p.a) * 2.2;
           p.life -= d < 34 ? 0.08 : 0.001;
-          ctx.globalAlpha = Math.max(0, p.life) * fade;
+          const alpha = Math.max(0, p.life) * fade;
+          ctx.globalAlpha = alpha;
           ctx.font = `${p.size * Math.max(0.45, d / Math.max(W,H))}px "Segoe UI Emoji", sans-serif`;
-          ctx.fillStyle = p.color; ctx.shadowColor = p.color; ctx.shadowBlur = 14;
-          ctx.fillText(p.text, p.x, p.y);
+          runtime.drawGlowText(ctx, p.text, p.x, p.y, `${p.size * Math.max(0.45, d / Math.max(W,H))}px "Segoe UI Emoji", sans-serif`, p.color, alpha, 14);
           if (p.life <= 0) particles[i] = spawn(false);
         }
-        ctx.shadowBlur = 0;
         if (elapsed > duration * 0.68) {
           ctx.globalAlpha = fade * Math.sin(elapsed * 0.02) * 0.5 + 0.5;
           ctx.font = '46px "Segoe UI Emoji", sans-serif';

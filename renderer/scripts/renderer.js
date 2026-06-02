@@ -23,7 +23,6 @@ class PetRenderer {
     this.naturalBlink = new NaturalBlink(this);
 
     // Mouse tracking state
-    this.lastMouseSpeed = 0;
     this.mouseNearPet = false;
     this.lastNearReaction = 0;
     this.lastActivityReaction = 0;
@@ -32,7 +31,6 @@ class PetRenderer {
     this.effectTimer = null;
     this._transitionCleanup = null;
     this._pendingCssClass = null;
-    this._resizeDebounce = null;
     this._isSleeping = false;
 
     // Micro-expression state
@@ -125,82 +123,6 @@ class PetRenderer {
     }, 320);
   }
 
-  // === Window Auto-Resize ===
-
-  measureAndResize() {
-    // Window size is fixed; no dynamic resizing needed
-  }
-
-  _doResize() {
-    const container = document.getElementById('pet-container');
-    const kaomojiRect = this.kaomojiEl.getBoundingClientRect();
-    const containerRect = container.getBoundingClientRect();
-
-    // Collect bounding boxes of all visible content
-    let topY = kaomojiRect.top;
-    let bottomY = kaomojiRect.bottom;
-    let leftX = kaomojiRect.left;
-    let rightX = kaomojiRect.right;
-
-    // Bubble
-    const bubbleEl = document.getElementById('speech-bubble');
-    if (bubbleEl && !bubbleEl.classList.contains('hidden')) {
-      const r = bubbleEl.getBoundingClientRect();
-      topY = Math.min(topY, r.top);
-      bottomY = Math.max(bottomY, r.bottom);
-      leftX = Math.min(leftX, r.left);
-      rightX = Math.max(rightX, r.right);
-    }
-
-    // Particles
-    const particles = this.particlesEl.querySelectorAll('.particle, .burst-particle');
-    for (const p of particles) {
-      const r = p.getBoundingClientRect();
-      topY = Math.min(topY, r.top);
-      bottomY = Math.max(bottomY, r.bottom);
-      leftX = Math.min(leftX, r.left);
-      rightX = Math.max(rightX, r.right);
-    }
-
-    // Toast
-    const toasts = document.querySelectorAll('#toast-container .toast');
-    for (const t of toasts) {
-      const r = t.getBoundingClientRect();
-      topY = Math.min(topY, r.top);
-      bottomY = Math.max(bottomY, r.bottom);
-    }
-
-    // Bottom section
-    const bottomSection = document.getElementById('bottom-section');
-    if (bottomSection && bottomSection.classList.contains('visible')) {
-      const r = bottomSection.getBoundingClientRect();
-      bottomY = Math.max(bottomY, r.bottom);
-    }
-
-    // Context menu
-    const ctxMenu = document.getElementById('context-menu');
-    if (ctxMenu && !ctxMenu.classList.contains('hidden')) {
-      const r = ctxMenu.getBoundingClientRect();
-      topY = Math.min(topY, r.top);
-      bottomY = Math.max(bottomY, r.bottom);
-      leftX = Math.min(leftX, r.left);
-      rightX = Math.max(rightX, r.right);
-    }
-
-    // Convert to window coordinates and add padding
-    const pad = 8;
-    const neededTop = topY - containerRect.top - pad;
-    const neededBottom = bottomY - containerRect.top + pad;
-    const neededLeft = leftX - containerRect.left - pad;
-    const neededRight = rightX - containerRect.left + pad;
-
-    const expandUp = neededTop < 0;
-    const contentWidth = Math.max(200, Math.min(600, Math.ceil(neededRight - Math.min(0, neededLeft))));
-    const contentHeight = Math.max(100, Math.min(800, Math.ceil(neededBottom - Math.min(0, neededTop))));
-
-    window.petAPI.resizeWindow(contentWidth, contentHeight, expandUp);
-  }
-
   renderSegmentedKaomoji(stage) {
     this.currentStage = stage;
     if (this.naturalBlink) this.naturalBlink.blinking = false;
@@ -209,7 +131,6 @@ class PetRenderer {
       `<span class="${seg.cls}">${seg.text}</span>`
     ).join('');
     this.kaomojiEl.innerHTML = html;
-    this.measureAndResize();
   }
 
   applyEffect(effectName) {
@@ -335,7 +256,6 @@ class PetRenderer {
     this._microTimer = setTimeout(() => {
       this._microTimer = null;
       this.resetToBase();
-      this.measureAndResize();
     }, duration);
   }
 
@@ -501,7 +421,6 @@ class PetRenderer {
     this.idleController.override = false;
     this.currentAnimation = null;
     this.renderSegmentedKaomoji(this.currentStage);
-    this.measureAndResize();
   }
 
   // === Bubble & Particles ===
@@ -520,18 +439,23 @@ class PetRenderer {
     this.bubbleOriginal.textContent = '';
     this.bubbleOriginal.style.display = 'none';
 
-    this.measureAndResize();
 
     this.bubbleTimer = setTimeout(() => {
       this.bubbleEl.classList.add('hidden');
-      this.measureAndResize();
     }, duration);
   }
 
   showKaomojiBubble(phrase, duration = 4000) {
     if (this.bubbleTimer) clearTimeout(this.bubbleTimer);
 
-    const encoded = encodeKaomojiText(phrase.text);
+    const CIPHER = {
+      'A':'ヮ','B':'Ψ','C':'ς','D':'∂','E':'ε','F':'ƒ','G':'ζ',
+      'H':'Ξ','I':'ι','J':'φ','K':'κ','L':'λ','M':'μ','N':'ν',
+      'O':'θ','P':'π','Q':'χ','R':'ρ','S':'σ','T':'τ','U':'υ',
+      'V':'∆','W':'ω','X':'ξ','Y':'ψ','Z':'ζ',
+      ' ':'・','!':'！','?':'？','.':'。',',':'、'
+    };
+    const encoded = phrase.text.split('').map(ch => CIPHER[ch.toUpperCase()] || ch).join('');
 
     this.bubbleEl.className = 'km-code';
     this.bubbleEl.classList.remove('hidden');
@@ -547,12 +471,10 @@ class PetRenderer {
       this.bubbleOriginal.style.display = this.bubbleEl.classList.contains('decoded') ? 'block' : 'none';
     };
 
-    this.measureAndResize();
 
     this.bubbleTimer = setTimeout(() => {
       this.bubbleEl.classList.add('hidden');
       this.bubbleEl.classList.remove('km-code', 'decoded');
-      this.measureAndResize();
     }, duration);
   }
 
@@ -579,10 +501,8 @@ class PetRenderer {
         el.style.fontSize = (14 + Math.random() * 8) + 'px';
         el.style.animationDelay = (i * 100) + 'ms';
         this.particlesEl.appendChild(el);
-        this.measureAndResize();
         setTimeout(() => {
           el.remove();
-          this.measureAndResize();
         }, particleDef.duration + 500);
       }, i * 150);
     }
