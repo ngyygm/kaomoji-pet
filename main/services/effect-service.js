@@ -152,7 +152,10 @@ class EffectService {
       autoHideMenuBar: true,
       hasShadow: false,
       backgroundColor: '#00000000',
-      parent: mainWindow || undefined,
+      // NO parent-child relationship.
+      // On Windows, owner-owned windows break WS_EX_TRANSPARENT hit-testing:
+      // clicks can't pass through the child to reach the owner.
+      // Instead, we keep the main window above the effect via moveTop().
       webPreferences: {
         nodeIntegration: true,
         contextIsolation: false,
@@ -161,7 +164,12 @@ class EffectService {
     });
 
     configureChromelessWindow(effectWin);
-    effectWin.setIgnoreMouseEvents(true, { forward: true });
+    // Click-through: effect window must never block mouse events to the pet.
+    effectWin.setIgnoreMouseEvents(true);
+    // Keep the main pet window ABOVE the effect window.
+    // Without parent-child, both are alwaysOnTop siblings;
+    // moveTop ensures the pet stays on top and always clickable.
+    if (mainWindow) mainWindow.moveTop();
     this.logger.write('effect:window-created', 'main', null, {
       id: effect.id,
       clickThrough: true,
@@ -176,7 +184,7 @@ class EffectService {
         duration: resolvedParams.duration,
         params: resolvedParams
       };
-      effectWin.setIgnoreMouseEvents(true, { forward: true });
+      effectWin.setIgnoreMouseEvents(true);
       effectWin.webContents.send('effect:start', payload);
       if (effect.startChannel) effectWin.webContents.send(effect.startChannel, resolvedParams);
     });
@@ -188,6 +196,10 @@ class EffectService {
         activeCount: this.activeEffectWindows.size
       });
       this.windowService.send('effects:closed', { id: effect.id, activeCount: this.activeEffectWindows.size });
+
+      // Safety net: re-assert main window z-order after effect closes.
+      const win = this.windowService.getWindow();
+      if (win) win.moveTop();
     });
 
     return effectWin;

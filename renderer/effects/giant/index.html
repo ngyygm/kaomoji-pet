@@ -213,6 +213,17 @@
       0% { background-position: 0% 50%; }
       100% { background-position: 200% 50%; }
     }
+
+    /* === Marquee: random 3~6 colors cycling === */
+    .marquee {
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      animation: marqueeSlide 1.5s linear infinite;
+    }
+    @keyframes marqueeSlide {
+      0% { background-position: 0% 50%; }
+      100% { background-position: 100% 50%; }
+    }
   </style>
 </head>
 <body>
@@ -408,34 +419,72 @@
       }
 
       // === Normal mode ===
-      const useRainbow = !color && Math.random() < 0.4;
+      // Color mode: 40% rainbow / 30% marquee / 30% solid
+      let colorMode = 'solid';
+      if (!color) {
+        const r = Math.random();
+        if (r < 0.4) colorMode = 'rainbow';
+        else if (r < 0.7) colorMode = 'marquee';
+      }
       const c = color || pick(COLORS);
 
       el.textContent = km;
-      const minSize = Math.min(window.innerWidth, window.innerHeight) * 0.5;
-      const maxSize = Math.min(window.innerWidth * 0.95, window.innerHeight * 0.9);
-      const fontSize = minSize + Math.random() * Math.max(1, maxSize - minSize);
+
+      // Measure natural text size at a reference font-size,
+      // then scale so the rendered text fits within a target box
+      // that is 50%~100% of the screen dimensions.
+      const refSize = 100;
+      const measurer = document.createElement('span');
+      measurer.style.cssText =
+        'font-size:' + refSize + 'px;' +
+        'font-family:"Segoe UI Emoji","Apple Color Emoji",sans-serif;' +
+        'white-space:nowrap;position:absolute;visibility:hidden;';
+      measurer.textContent = km;
+      document.body.appendChild(measurer);
+      const naturalW = measurer.offsetWidth;
+      const naturalH = measurer.offsetHeight;
+      document.body.removeChild(measurer);
+
+      const scale = 0.5 + Math.random() * 0.5;
+      const targetW = window.innerWidth * scale;
+      const targetH = window.innerHeight * scale;
+      const fitScale = Math.min(
+        naturalW > 0 ? targetW / naturalW : 1,
+        naturalH > 0 ? targetH / naturalH : 1
+      );
+      const fontSize = Math.round(refSize * fitScale);
       el.style.fontSize = fontSize + 'px';
 
-      if (useRainbow) {
-        el.classList.add('rainbow');
+      // Apply color mode
+      const colorClass = colorMode === 'rainbow' ? ' rainbow' : colorMode === 'marquee' ? ' marquee' : '';
+      if (colorMode === 'rainbow') {
         el.style.textShadow = '0 0 80px rgba(255,150,200,0.6), 0 0 160px rgba(129,140,248,0.4)';
+      } else if (colorMode === 'marquee') {
+        // Pick 3~6 random colors for the marquee gradient
+        const count = 3 + Math.floor(Math.random() * 4);
+        const shuffled = [...COLORS].sort(() => Math.random() - 0.5);
+        const picks = shuffled.slice(0, count);
+        const grad = picks.join(', ') + ', ' + picks[0];
+        el.style.background = 'linear-gradient(90deg, ' + grad + ')';
+        el.style.backgroundSize = (count + 1) * 100 + '% 100%';
+        const glowA = picks[0], glowB = picks[Math.floor(count / 2)];
+        el.style.textShadow = '0 0 80px ' + glowA + ', 0 0 160px ' + glowB;
       } else {
         el.style.color = c;
-        el.style.textShadow = `0 0 80px ${c}, 0 0 160px ${c}`;
+        el.style.textShadow = '0 0 80px ' + c + ', 0 0 160px ' + c;
       }
 
       const appearClass = pick(APPEARS);
-      el.className = appearClass + (useRainbow ? ' rainbow' : '');
+      el.className = appearClass + colorClass;
 
       const idleClass = pick(IDLES);
       setTimeout(() => {
-        el.className = idleClass + (useRainbow ? ' rainbow' : '');
+        el.className = idleClass + colorClass;
       }, 600);
 
       const exitClass = pick(EXITS);
       setTimeout(() => {
-        el.className = exitClass + (useRainbow ? ' rainbow' : '');
+        el.className = exitClass + colorClass;
       }, 2400);
 
       for (let i = 0; i < 30; i++) {
@@ -449,7 +498,7 @@
           p.style.setProperty('--ty', Math.sin(angle) * dist + 'px');
           p.style.left = '50%';
           p.style.top = '50%';
-          p.style.color = useRainbow ? pick(COLORS) : c;
+          p.style.color = colorMode !== 'solid' ? pick(COLORS) : c;
           p.style.animationDelay = (Math.random() * 0.3) + 's';
           p.style.fontSize = (20 + Math.random() * 30) + 'px';
           document.body.appendChild(p);

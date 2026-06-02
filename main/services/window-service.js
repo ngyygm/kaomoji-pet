@@ -16,6 +16,7 @@ class WindowService {
   constructor({ logger }) {
     this.logger = logger;
     this.mainWindow = null;
+    this._heartbeatTimer = null;
   }
 
   createMainWindow() {
@@ -48,6 +49,8 @@ class WindowService {
     });
 
     configureChromelessWindow(this.mainWindow);
+    // Always capture mouse events — left-click must never break.
+    // Trade-off: transparent areas also capture, but the window is small (350×260).
     this.mainWindow.setIgnoreMouseEvents(false);
     this.mainWindow.loadFile(path.join(__dirname, '..', '..', 'renderer', 'index.html'));
     this.mainWindow.setVisibleOnAllWorkspaces(true);
@@ -55,10 +58,12 @@ class WindowService {
     this.mainWindow.once('ready-to-show', () => {
       if (!this.mainWindow || this.mainWindow.isDestroyed()) return;
       this.mainWindow.show();
+      this.startHeartbeat();
       this.logger.write('app-ready', 'main', this.getState());
     });
 
     this.mainWindow.on('closed', () => {
+      this.stopHeartbeat();
       this.logger.write('window-closed', 'main');
       this.mainWindow = null;
     });
@@ -127,6 +132,36 @@ class WindowService {
         height: safeHeight
       });
       return false;
+    }
+  }
+
+  /**
+   * Periodically re-assert critical window properties.
+   * Windows 10 DWM can stop delivering WM_LBUTTONDOWN to
+   * WS_EX_LAYERED (transparent) alwaysOnTop windows after
+   * minutes of idle — while WM_MOUSEMOVE and WM_RBUTTONDOWN
+   * continue to work.  Toggling the flag forces DWM to
+   * refresh its internal hit-test cache; a simple re-set
+   * of the same value does NOT.
+   */
+  startHeartbeat() {
+    this.stopHeartbeat();
+    this._heartbeatTimer = setInterval(() => {
+      const win = this.getWindow();
+      if (!win) return;
+      // Toggle: true then false forces a state transition
+      // that DWM actually processes. Setting the same value
+      // is a no-op at the OS level.
+      win.setIgnoreMouseEvents(true);
+      win.setIgnoreMouseEvents(false);
+      win.setAlwaysOnTop(true);
+    }, 10_000);
+  }
+
+  stopHeartbeat() {
+    if (this._heartbeatTimer) {
+      clearInterval(this._heartbeatTimer);
+      this._heartbeatTimer = null;
     }
   }
 
