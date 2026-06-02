@@ -117,9 +117,9 @@ class EffectService {
     const effectWin = new BrowserWindow({
       title: ' ',
       width, height, x: 0, y: 0,
-      transparent: true, frame: false, titleBarStyle: 'hidden',
+      transparent: true, frame: false,
       alwaysOnTop: true, resizable: false, focusable: false,
-      skipTaskbar: true, autoHideMenuBar: true, hasShadow: false,
+      skipTaskbar: true, hasShadow: false, show: false,
       backgroundColor: '#00000000',
       webPreferences: {
         nodeIntegration: true,
@@ -130,13 +130,14 @@ class EffectService {
 
     effectWin.removeMenu();
     effectWin.setIgnoreMouseEvents(true);
+    effectWin.showInactive();
 
-    // Windows: 彻底移除标题栏残留边框
-    if (process.platform === 'win32') {
-      effectWin.hookWindowMessage(0x0083, () => {});
-    }
+    // 窗口失焦时立即重置视觉状态，防止 Windows DWM 绘制标题栏
+    effectWin.on('blur', () => {
+      if (!effectWin.isDestroyed()) effectWin.showInactive();
+    });
 
-    if (mainWindow) { mainWindow.moveTop(); mainWindow.blur(); }
+    if (mainWindow) { mainWindow.moveTop(); mainWindow.showInactive(); }
 
     this.logger.write('effect:window-created', 'main', null, {
       id: effect.id, clickThrough: true, activeCount: this.activeEffectWindows.size + 1
@@ -156,7 +157,7 @@ class EffectService {
       this.logger.write('effect:closed', 'main', null, { id: effect.id, activeCount: this.activeEffectWindows.size });
       this.windowService.send('effects:closed', { id: effect.id, activeCount: this.activeEffectWindows.size });
       const win = this.windowService.getWindow();
-      if (win) { win.moveTop(); win.blur(); }
+      if (win) { win.moveTop(); win.showInactive(); }
     });
 
     return effectWin;

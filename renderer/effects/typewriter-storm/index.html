@@ -1,13 +1,235 @@
 <!DOCTYPE html>
-<html lang="zh-CN"><head><meta charset="UTF-8"><title> </title><script src="../_shared/effect-runtime.js"></script><style>*{margin:0;padding:0;user-select:none}html,body{width:100%;height:100%;overflow:hidden;background:transparent}.glyph{position:absolute;font-family:"Segoe UI Emoji","Microsoft YaHei",sans-serif;white-space:nowrap;pointer-events:none;text-shadow:0 0 14px currentColor;will-change:transform,opacity}.cursor{position:absolute;width:14px;height:34px;background:#fde68a;box-shadow:0 0 18px #fde68a}</style></head><body><div class="cursor"></div><script>
+<html lang="zh-CN"><head><meta charset="UTF-8"><title> </title><script src="../_shared/effect-runtime.js"></script><style>*{margin:0;padding:0;user-select:none}html,body{width:100%;height:100%;overflow:hidden;background:transparent}.glyph{position:absolute;font-family:"Segoe UI Emoji","Microsoft YaHei",sans-serif;white-space:nowrap;pointer-events:none;text-shadow:0 0 8px currentColor;will-change:transform,opacity}.cursor{position:absolute;width:8px;height:20px;background:#fde68a;box-shadow:0 0 12px #fde68a;pointer-events:none;border-radius:1px}</style></head><body><div class="cursor"></div><script>
 const { ipcRenderer } = require('electron');
-ipcRenderer.on('effect:start',(event,payload)=>start(payload?.duration||12500));
-function start(duration){const runtime=EffectRuntime.createRuntime({id:'typewriter-storm',adaptiveQuality:true,minQuality:0.5});const W=innerWidth,H=innerHeight, lines=['今天也在认真运行中','(=^・ω・^=) 记录一颗星','错误已被可爱化处理','灵感缓存命中 100%','把烦恼折成纸飞机','٩(๑❛ᴗ❛๑)۶ 好耶'];const colors=['#fde68a','#93c5fd','#f9a8d4','#86efac','#c084fc'];const cursor=document.querySelector('.cursor');let chars=[],idx=0,line=0,col=0,last=performance.now(),startTime=last,wind=false;const pick=a=>a[Math.floor(Math.random()*a.length)];
-function addChar(){const text=lines[line%lines.length];if(col>=text.length){line++;col=0;idx=0;return;}const e=document.createElement('div');e.className='glyph';e.textContent=text[col++];e.style.color=pick(colors);e.style.fontSize=24+Math.random()*18+'px';const x=W*.12+idx*28,y=H*.16+(line%7)*58,angle=(Math.random()-.5)*4;e.style.transform=`translate(${x}px, ${y}px) rotate(${angle}deg)`;document.body.appendChild(e);chars.push({el:e,x,y,vx:0,vy:0,rot:0});idx++;}
-function loop(now){const elapsed=now-startTime,fade=Math.max(0,Math.min(1,(duration-elapsed)/700));if(!wind&&elapsed>duration*.55){wind=true;chars.forEach(c=>{c.vx=4+Math.random()*9;c.vy=(Math.random()-.5)*5;c.rot=(Math.random()-.5)*18;});}
-if(!wind&&now-last>36){last=now;addChar();if(Math.random()<.25)addChar();}
-chars.forEach(c=>{if(wind){c.x+=c.vx;c.y+=c.vy;c.vy+=.03;c.el.style.transform=`translate(${c.x}px, ${c.y}px) rotate(${c.rot*(elapsed-duration*.55)*.01}deg)`;}else{c.el.style.transform=`translate(${c.x}px, ${c.y}px)`;}c.el.style.opacity=fade;});
-const active=chars[chars.length-1];if(active&&!wind){cursor.style.left=active.x+28+'px';cursor.style.top=active.y+'px';cursor.style.opacity=Math.sin(now*.02)>0?fade:0;}else cursor.style.opacity=0;
-chars=chars.filter(c=>c.x<W+200&&c.y>-100&&c.y<H+120);if(elapsed<duration)requestAnimationFrame(loop);else window.close();}
-requestAnimationFrame(loop);}
+ipcRenderer.on('effect:start',(event,payload)=>start(payload?.duration||20000));
+
+function start(totalDuration){
+  const W=innerWidth,H=innerHeight;
+
+  /* ══════ 100 条文案池 ══════ */
+  const ALL_LINES=[
+    '今天也在认真运行中','错误已被可爱化处理','灵感缓存命中 100%','把烦恼折成纸飞机',
+    '系统可爱度 200%','你今天也很棒哦','咖啡续命中…','进度条加载中 ██████',
+    '奶茶加冰 烦恼归零','星星掉进代码里','传送门已开启','宇宙信号接收中 📡',
+    '今日份好运已发放','电量满格元气满满','梦想编译中… 0 error','像素小精灵出没注意',
+    '月亮不睡我不睡','云朵收集者在线','彩虹正在派送中','甜度超标预警',
+    '好运正在加载 ██░░','你的专属小太阳已上线','快乐溢出 stack overflow','这是一个彩蛋',
+    '距离下班还有 3 秒','CPU 正在摸鱼','内存装满了快乐','像素已就位',
+    '灵感通道已打开','心跳同步成功','频率匹配中 ♪♫','魔法正在施展',
+    '可爱守护进程已启动','心情防火墙: 已开启','拥抱协议握手成功','幸福进程 PID:520',
+    '烦恼已被回收站清空','微笑服务运行中','暖流正在传输中','好运路由已优化',
+    '快乐编译通过 ✓','忧伤已被 try-catch','希望对象实例化成功','温柔线程池已满载',
+    '幸福正在序列化','梦想容器已就绪','星辰大海指针非空','未来数组长度 = ∞',
+    '快乐回调已触发','温暖信号量 +1','治愈模块 import 成功','正能量迭代器 hasNext',
+    '萌点溢出 Error','可爱指数爆表','甜度翻倍中…','温柔正在多线程',
+    '幸福倒计时 3…2…1','快乐分配器运行中','梦想路由表更新完成','希望进程已守护',
+    '今日可爱已签收','卫星已对准快乐星球','彩虹缓存命中','晴天模式已激活',
+    '星光带宽已拉满','心动包已送达','甜甜圈协议握手成功','银河漫游指南加载中',
+    '小确幸队列处理中','暖意广播已发送','元气模块启动成功','舒适温度已锁定',
+    '好运 DNS 已解析','快乐 CDN 已加速','幸福负载均衡完成','梦想微服务上线',
+    '温柔 API 响应 200','可爱容器编排中','希望持久化写入成功','治愈消息队列消费中',
+    '星辰防火墙开放端口 520','甜蜜证书签发成功','快乐数据库索引优化完成','梦想集群节点就绪',
+    '暖流 WebSocket 已连接','好运定时任务已注册','幸福缓存已预热','萌力自动扩容完成',
+    '治愈日志 Level: MAX','快乐监控告警: 全部正常','梦想部署流水线 Green','希望心跳检测通过',
+    '温柔限流策略: 无上限','可爱无限不循环','今日emo已被垃圾回收','快乐递归没有出口',
+    '幸福是尾调用优化','梦想已存入 git','温柔没有 merge conflict','星辰 never undefined',
+    '好运手账已翻开新页','可爱协议双向认证成功'
+  ];
+
+  /* Fisher-Yates 洗牌，抽 50 条 */
+  const pool=ALL_LINES.slice();
+  for(let i=pool.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[pool[i],pool[j]]=[pool[j],pool[i]];}
+  const lineCount=20+Math.floor(Math.random()*51); // 20~70
+  const lines=pool.slice(0,lineCount);
+
+  const colors=['#fde68a','#93c5fd','#f9a8d4','#86efac','#c084fc','#fca5a5','#fdba74','#67e8f9'];
+  const pick=a=>a[Math.floor(Math.random()*a.length)];
+
+  const cursor=document.querySelector('.cursor');
+  let allChars=[];
+  let wind=false, windStartTime=0;
+  let sparkles=[]; // 粒子特效
+
+  /* 用 canvas 画粒子，叠在文字下面 */
+  const cvs=document.createElement('canvas');
+  cvs.style.cssText='position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:-1';
+  document.body.appendChild(cvs);
+  const cx=cvs.getContext('2d');
+  function resizeCvs(){cvs.width=W;cvs.height=H;}
+  resizeCvs();
+
+  /* ══════ 并行打字机：5~8 条线同时打，错位启动 ══════ */
+  const WORKER_COUNT=5+Math.floor(Math.random()*4); // 5~8
+  const TYPE_SPEED=18; // ms/字
+  const STAGGER=200;   // 每条线错位 0~200ms
+
+  /* 把 50 行分配给 worker，每条 worker 领若干行，依次打 */
+  const workers=[];
+  let lineIdx=0;
+  for(let w=0;w<WORKER_COUNT&&lineIdx<lines.length;w++){
+    const assigned=[];
+    // 每条 worker 领 ~6 行
+    const take=Math.max(1,Math.ceil(lines.length/WORKER_COUNT));
+    for(let t=0;t<take&&lineIdx<lines.length;t++) assigned.push(lineIdx++);
+    workers.push({
+      lines:assigned,
+      curLine:0,          // 当前在 assigned 中的索引
+      col:0,              // 当前字符位置
+      delay:w*STAGGER+Math.random()*150, // 错位延迟
+      started:false,
+      done:false
+    });
+  }
+
+  /* 预计算每行的随机位置 */
+  const linePositions=lines.map((_,i)=>{
+    const fontSize=30+Math.random()*30;
+    const charW=fontSize;
+    const textW=lines[i].length*charW;
+    const maxX=Math.max(20, W-textW-30);
+    const maxY=Math.max(20, H*0.88-fontSize);
+    return {
+      x: 20+Math.random()*maxX,
+      y: H*0.06+Math.random()*maxY,
+      fontSize,
+      charW
+    };
+  });
+
+  let startTime=performance.now();
+  let allTypingDone=false, typingDoneTime=0;
+
+  function updateWorker(worker,now){
+    if(worker.done) return;
+    const wElapsed=now-startTime-worker.delay;
+    if(wElapsed<0) return; // 还没到启动时间
+    if(!worker.started){worker.started=true;}
+
+    if(worker.curLine>=worker.lines.length){
+      worker.done=true;
+      return;
+    }
+
+    const li=worker.lines[worker.curLine];
+    const text=lines[li];
+    if(worker.col>=text.length){
+      worker.curLine++;
+      worker.col=0;
+      return;
+    }
+
+    /* 每 TYPE_SPEED ms 打一个字 */
+    if(!worker._lastType) worker._lastType=now;
+    if(now-worker._lastType>=TYPE_SPEED){
+      worker._lastType=now;
+      const pos=linePositions[li];
+      const ch=text[worker.col];
+
+      const e=document.createElement('div');
+      e.className='glyph';
+      e.textContent=ch;
+      e.style.color=pick(colors);
+      e.style.fontSize=pos.fontSize+'px';
+      const x=pos.x+worker.col*pos.charW;
+      const y=pos.y;
+      const angle=(Math.random()-0.5)*3;
+      e.style.transform=`translate(${x}px,${y}px) rotate(${angle}deg)`;
+      document.body.appendChild(e);
+      allChars.push({el:e,x,y,vx:0,vy:0,rot:0});
+
+      worker.col++;
+    }
+  }
+
+  function loop(now){
+    const elapsed=now-startTime;
+
+    /* ── 阶段 1：并行打字 ── */
+    if(!allTypingDone){
+      let allDone=true;
+      for(const w of workers){
+        updateWorker(w,now);
+        if(!w.done) allDone=false;
+      }
+      if(allDone){
+        allTypingDone=true;
+        typingDoneTime=now;
+        cursor.style.opacity=0;
+      } else {
+        // 光标跟随最后添加的字符
+        const last=allChars[allChars.length-1];
+        if(last){
+          cursor.style.left=(last.x+20)+'px';
+          cursor.style.top=last.y+'px';
+          cursor.style.opacity=Math.sin(now*0.015)>0?1:0;
+        }
+      }
+    }
+    /* ── 阶段 2：打完等 3 秒 ── */
+    else if(!wind){
+      if(now-typingDoneTime>1000){
+        wind=true;
+        windStartTime=now;
+        // 随机选一个主方向，所有字符围绕这个方向散射
+        const mainAngle=Math.random()*Math.PI*2;
+        allChars.forEach(c=>{
+          const a=mainAngle+(Math.random()-0.5)*1.6;
+          const speed=4+Math.random()*10;
+          c.vx=Math.cos(a)*speed;
+          c.vy=Math.sin(a)*speed;
+          c.rot=(Math.random()-0.5)*20;
+          // 每个字符喷出 2~4 个小粒子
+          const count=2+Math.floor(Math.random()*6);
+          for(let k=0;k<count;k++){
+            sparkles.push({
+              x:c.x, y:c.y,
+              vx:(Math.random()-0.5)*12,
+              vy:(Math.random()-0.5)*10,
+              life:0,
+              maxLife:30+Math.random()*40,
+              color:pick(colors),
+              size:2+Math.random()*4
+            });
+          }
+        });
+      }
+    }
+
+    /* ── 阶段 3：风吹散 + 粒子 ── */
+    if(wind){
+      const we=now-windStartTime;
+      const fade=Math.max(0,1-we/2000);
+      for(const c of allChars){
+        c.x+=c.vx; c.y+=c.vy; c.vy+=0.05;
+        c.el.style.transform=`translate(${c.x}px,${c.y}px) rotate(${c.rot*we*0.008}deg)`;
+        c.el.style.opacity=fade;
+      }
+      // 绘制粒子
+      cx.clearRect(0,0,W,H);
+      for(let i=sparkles.length-1;i>=0;i--){
+        const s=sparkles[i];
+        s.x+=s.vx; s.y+=s.vy; s.vy+=0.08; s.vx*=0.98;
+        s.life++;
+        const a=1-s.life/s.maxLife;
+        if(a<=0){sparkles.splice(i,1);continue;}
+        cx.globalAlpha=a;
+        cx.fillStyle=s.color;
+        cx.beginPath();
+        cx.arc(s.x,s.y,Math.max(0.5,s.size*a),0,Math.PI*2);
+        cx.fill();
+      }
+      cx.globalAlpha=1;
+    }
+
+    // 清理飞出屏幕的
+    allChars=allChars.filter(c=>c.x<W+300&&c.y>-200&&c.y<H+200);
+
+    // 结束
+    const allGone=allTypingDone&&wind&&allChars.length===0&&sparkles.length===0;
+    const timeout=elapsed>totalDuration;
+    if(!allGone&&!timeout) requestAnimationFrame(loop);
+    else window.close();
+  }
+  requestAnimationFrame(loop);
+}
 </script></body></html>

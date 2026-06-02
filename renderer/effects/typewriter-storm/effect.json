@@ -6,7 +6,7 @@
   "version": "1.0.0",
   "description": "字符像打字机一样逐行敲出，再被风吹散。",
   "entry": "index.html",
-  "duration": 12500,
+  "duration": 20000,
   "window": {
     "type": "fullscreen-transparent",
     "clickThrough": true,
@@ -19,7 +19,7 @@
     "particles": null
   },
   "params": {
-    "duration": { "type": "number", "default": 12500 }
+    "duration": { "type": "number", "default": 20000 }
   },
   "enabled": true
 }
