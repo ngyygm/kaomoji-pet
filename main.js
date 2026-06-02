@@ -21,7 +21,11 @@ function configureChromelessWindow(win) {
 
 function toWindowCoord(value) {
   const n = Number(value);
-  return Number.isFinite(n) ? Math.round(n) : null;
+  if (!Number.isFinite(n)) return null;
+  const rounded = Math.round(n);
+  // Electron setPosition expects 32-bit signed integers
+  if (rounded < -0x7FFFFFFF || rounded > 0x7FFFFFFF) return null;
+  return rounded;
 }
 
 function setWindowPositionSafe(win, x, y) {
@@ -29,7 +33,12 @@ function setWindowPositionSafe(win, x, y) {
   const safeX = toWindowCoord(x);
   const safeY = toWindowCoord(y);
   if (safeX === null || safeY === null) return false;
-  win.setPosition(safeX, safeY);
+  try {
+    win.setPosition(safeX, safeY);
+  } catch (err) {
+    console.error('setPosition failed:', err.message, { x: safeX, y: safeY, rawX: x, rawY: y });
+    return false;
+  }
   return true;
 }
 
@@ -162,6 +171,9 @@ function createEffectWindow(effect, resolvedParams) {
 }
 
 function runBigEffect(effectId, params = {}) {
+  const { width, height } = screen.getPrimaryDisplay().workAreaSize;
+  if (!width || !height) return { success: false, error: 'Screen off, skipping effect' };
+
   const effect = loadBigEffects().find(item => item.id === effectId);
   if (!effect) return { success: false, error: `Unknown big effect: ${effectId}` };
 
@@ -350,6 +362,22 @@ function stopSystemMonitor() {
   }
 }
 
+// Ensure the window is within the current screen bounds.
+// If it's off-screen (resolution change, monitor disconnect, resume from sleep),
+// move it back to the bottom-right corner.
+function ensureWindowOnScreen(win) {
+  if (!win || win.isDestroyed()) return;
+  const { width, height } = screen.getPrimaryDisplay().workAreaSize;
+  if (!width || !height) return;
+  const [curX, curY] = win.getPosition();
+  const [winW, winH] = win.getSize();
+  const padding = 20;
+  // Off-screen if completely outside the work area
+  if (curX + winW < 0 || curY + winH < 0 || curX > width || curY > height) {
+    setWindowPositionSafe(win, width - winW - padding, height - winH - padding);
+  }
+}
+
 // === IPC Handlers ===
 
 ipcMain.on('window-move', (event, { deltaX, deltaY }) => {
@@ -434,7 +462,8 @@ function generateCurvePath(sx, sy, tx, ty, type) {
 
 ipcMain.on('move-window-to', (event, { targetX, targetY, curveType, step }) => {
   if (!mainWindow || mainWindow.isDestroyed()) return;
-  if (typeof targetX !== 'number' || typeof targetY !== 'number' || isNaN(targetX) || isNaN(targetY)) return;
+  if (typeof targetX !== 'number' || typeof targetY !== 'number') return;
+  if (!Number.isFinite(targetX) || !Number.isFinite(targetY)) return;
   if (moveAnimTimer) { clearInterval(moveAnimTimer); moveAnimTimer = null; }
 
   // Handle legacy 'step' parameter for jump (large number = instant)
@@ -659,6 +688,17 @@ app.whenReady().then(() => {
   Menu.setApplicationMenu(null);
   createMainWindow();
   startSystemMonitor();
+
+  // Handle display changes: resolution change, monitor add/remove, remote desktop switch
+  screen.on('display-metrics-changed', () => {
+    if (moveAnimTimer) { clearInterval(moveAnimTimer); moveAnimTimer = null; }
+    ensureWindowOnScreen(mainWindow);
+  });
+
+  screen.on('display-removed', () => {
+    if (moveAnimTimer) { clearInterval(moveAnimTimer); moveAnimTimer = null; }
+    ensureWindowOnScreen(mainWindow);
+  });
 });
 
 // Crash recovery: recreate window if renderer crashes
@@ -673,9 +713,19 @@ app.on('render-process-gone', (_, webContents, details) => {
 
 // Handle system suspend/resume
 try {
+  powerMonitor.on('suspend', () => {
+    // Stop walk animation to prevent crash when screen returns {0,0}
+    if (moveAnimTimer) { clearInterval(moveAnimTimer); moveAnimTimer = null; }
+  });
+
   powerMonitor.on('resume', () => {
+    // Stop any stale walk animation
+    if (moveAnimTimer) { clearInterval(moveAnimTimer); moveAnimTimer = null; }
+
     if (!mainWindow || mainWindow.isDestroyed()) {
       createMainWindow();
+    } else {
+      ensureWindowOnScreen(mainWindow);
     }
     // Restart system monitor if it died
     if (!systemMonitorTimer) startSystemMonitor();

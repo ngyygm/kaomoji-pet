@@ -991,6 +991,8 @@ class ScreenWalker {
     const screen = await window.petAPI.getScreenSize();
     const winSize = await window.petAPI.getWindowSize();
     if (!screen || !winSize) return;
+    // Guard: screen asleep/disconnected returns {0,0}
+    if (!screen.width || !screen.height) return;
 
     const padding = 20;
     const targetX = padding + Math.random() * (screen.width - winSize.width - padding * 2);
@@ -1007,6 +1009,8 @@ class ScreenWalker {
     const screen = await window.petAPI.getScreenSize();
     const winSize = await window.petAPI.getWindowSize();
     if (!screen || !winSize) return;
+    // Guard: screen asleep/disconnected returns {0,0}
+    if (!screen.width || !screen.height) return;
 
     // Play disappear animation
     this.renderer.playJumpDisappear();
